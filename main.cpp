@@ -74,7 +74,7 @@ class EmergencyVehicle : public Vehicle{
 
 
 };
-
+#include "ArrayPriorityQueue.hpp"
 int main(){
     cout<<"\n=================================================="<<endl;
     cout<<"ADAPTIVE TRAFFIC SIGNAL AND EMERGENCY VEHICLE SIMULATOR --> PHASE 1" <<endl;
