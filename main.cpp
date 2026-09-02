@@ -6,13 +6,13 @@
 #include <iostream>
 #include <string>
 using namespace std;
-//:::::Junction consist of "ID" and its "name":::::
+//Junction consist of "ID" and its "name"
 struct Junction{
     int junctionID;
     string name;
 };
 
-//:::::Emergency Request Information:::::
+//Emergency Request Information
 struct EmergencyRequest{
     int vehicleID;
     int priorityLVL;
@@ -20,7 +20,7 @@ struct EmergencyRequest{
     string label;
 };
 
-//:::::Emergency Comparison: "Which emergency vehicle will go first?":::::
+//Emergency Comparison
 struct EmergencyComparison{
     bool operator()(const EmergencyRequest& a, const EmergencyRequest& b){
         if(a.priorityLVL == b.priorityLVL){
@@ -32,7 +32,7 @@ struct EmergencyComparison{
     }
 };
 
-//:::::Vehicle class to represent a vehicle with an ID:::::
+//Vehicle class
 class Vehicle{
     private:
         int vehID;
@@ -49,7 +49,7 @@ class Vehicle{
         }
 };
 
-//:::::Emergency Vehicle class to represent an emergency vehicle:::::
+//Emergency Vehicle class to represent an emergency vehicle
 class EmergencyVehicle : public Vehicle{
     string type;
     int priority;
