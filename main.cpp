@@ -1,18 +1,14 @@
-/*#include "ArrayPriorityQueue.hpp"
-#include "ArrayQueue.hpp"
-#include "ArrayStack.hpp"
-#include "SinglyLinkedList.hpp"*/
-
 #include <iostream>
 #include <string>
 using namespace std;
-//Junction consist of "ID" and its "name"
+
+//junction node
 struct Junction{
     int junctionID;
     string name;
 };
 
-//Emergency Request Information
+//emergency request info
 struct EmergencyRequest{
     int vehicleID;
     int priorityLVL;
@@ -20,14 +16,14 @@ struct EmergencyRequest{
     string label;
 };
 
-//Emergency Comparison
+//comparison
 struct EmergencyComparison{
     bool operator()(const EmergencyRequest& a, const EmergencyRequest& b){
         if(a.priorityLVL == b.priorityLVL){
-            // Higher arrival time means later
+
             return a.arrivalTime > b.arrivalTime;
         }
-        // Lower priority level means higher priority
+
         return a.priorityLVL < b.priorityLVL;
     }
 };
@@ -37,7 +33,7 @@ class Vehicle{
     private:
         int vehID;
     public:
-        //Vehicle class constructor
+        //constructor
         Vehicle(int id){
             vehID = id;
         }
@@ -49,12 +45,13 @@ class Vehicle{
         }
 };
 
-//Emergency Vehicle class to represent an emergency vehicle
+
+//Emergency Vehicle class
 class EmergencyVehicle : public Vehicle{
     string type;
     int priority;
     public:
-        //EmergencyVehicle inherited class constructor
+        //constructor
         EmergencyVehicle(int id, string t, int p): Vehicle(id){
             type = t;
             priority = p;
@@ -74,20 +71,33 @@ class EmergencyVehicle : public Vehicle{
 
 
 };
+
 #include "ArrayPriorityQueue.hpp"
+/*#include "ArrayQueue.hpp"
+#include "ArrayStack.hpp"
+#include "SinglyLinkedList.hpp"*/
+
 int main(){
     cout<<"\n=================================================="<<endl;
-    cout<<"ADAPTIVE TRAFFIC SIGNAL AND EMERGENCY VEHICLE SIMULATOR --> PHASE 1" <<endl;
+    cout<<"ADAPTIVE TRAFFIC SIGNAL AND EMERGENCY VEHICLE SIMULATOR"<<endl;
     cout<<"==================================================\n"<<endl;
+
+    Vehicle car(101);
+    Vehicle bike(121);
+    Vehicle bus(223);
+    EmergencyVehicle ambu(102, "Ambulance", 1);
+    EmergencyVehicle fireT(202, "Fire Truck", 2);
+    EmergencyVehicle ambu2(221, "Ambulance", 1);
+
     /*Vehicle car(101);
     car.ShowVehicle();
     cout<<"\n";
     EmergencyVehicle ambulance(102, "Ambulance", 1);
     ambulance.ShowEmergencyVehicle();*/
 
-    //ARRAY OF JUNCTIONS:
-    cout<<"STEP 1: ARRAY"<<endl;
-    cout<<"--------------------------------------------------\n"<<endl;
+//JUNCTIONS:
+    cout<<"# 1: ARRAY #"<<endl;
+    
     Junction junctions[6]={
         {1, "J1"},
         {2, "J2"},
@@ -96,51 +106,87 @@ int main(){
         {5, "J5"},
         {6, "J6"}
     };
-    cout<<"Junctions Information:\n"<< std::endl;
+    cout<<"Junctions Info. :"<<endl;
     for(int i=0; i<6; i++){
-        cout<<"Junction ID: "<<junctions[i].junctionID<<", Name: "<<junctions[i].name<<endl;
+        cout<<"Junction ID:"<<junctions[i].junctionID;
+        cout<<" , Name:"<<junctions[i].name<<endl;
     }
     cout<<"\n";
+    cout<<"------------------------------------\n"<<endl;
 
-    //QUEUE OF VEHICLES:
-    cout<<"STEP 2: QUEUE"<<endl;
-    cout<<"--------------------------------------------------\n"<<endl;
+//QUEUE of all vehicles at J:
+    cout<<"# 2: QUEUE #\n"<<endl;
+    
+    cout<<"------------------------------------\n"<<endl;
+
+//QUEUE of emergency vehicles:
+    cout<<"# 3: PRIORITY QUEUE #\n"<<endl;
+    
+    cout<<"Emergency Vehicles Coming!!\n"<<endl;
+    ArrayPriorityQueue EmergencyQ;
+    EmergencyRequest r1 = {ambu.getID(), ambu.getPriorityLvl(), 1000, ambu.getType()};
+    EmergencyRequest r2 = {fireT.getID(), fireT.getPriorityLvl(), 2000, fireT.getType()};
+    EmergencyRequest r3 = {ambu2.getID(), ambu2.getPriorityLvl(), 1500, ambu2.getType()};
+
+    //emergency requests pushed into P.Queue
+    EmergencyQ.push(r1);EmergencyQ.push(r2);EmergencyQ.push(r3);
+    cout<<"Emergency Requests Added!!\n\n"<<endl;
+
+    cout<<"Emergency Vehicles Going!!!\n"<<endl;
+    while(!EmergencyQ.isEmpty()){
+        EmergencyRequest topReq = EmergencyQ.top();
+        cout<<"Vehicle ID: "<<topReq.vehicleID<<", Priority Level: "<<topReq.priorityLVL<<", Arrival Time: "<<topReq.arrivalTime<<", Label: "<<topReq.label<<endl;
+        EmergencyQ.pop();
+    }
+
+    cout<<"\n";
+    cout<<"------------------------------------\n"<<endl;
+
+//ROUTE:
+    cout<<"#4: LINKED LIST #\n"<<endl;
+   
 
 
+    cout<<"------------------------------------\n"<<endl;
 
 
-    //PRIORITY QUEUE OF EMERGENCY VEHICLES:
-    cout<<"STEP 3: PRIORITY QUEUE"<<endl;
-    cout<<"--------------------------------------------------\n"<<endl;
+//ROUTE HISTORY:
+    cout<<"# 5: STACK #\n"<<endl; 
 
 
-
-    //LINKED LIST FOR ROUTE:
-    cout<<"STEP 4: LINKED LIST"<<endl;
-    cout<<"--------------------------------------------------\n"<<endl;
+    cout<<"------------------------------------\n"<<endl;
 
 
+//CONCEPT OF OOP:
+    cout<<"# 6: OOP #"<<endl;
 
-    //STACK FOR ROUTE HISTORY:
-    cout<<"STEP 5: STACK"<<endl;
-    cout<<"--------------------------------------------------\n"<<endl; 
-
-
-
-    //CONCEPT OF OOP:
-    cout<<"STEP 6: OOP"<<endl;
-    cout<<"--------------------------------------------------\n"<<endl;
-
-    Vehicle car(101);
-    cout<<"Car Information:\n";
+    cout<<"===================="<<endl;
+    cout<<"Vehicle Info."<<endl;
+    cout<<"====================\n"<<endl;
+    cout<<"Car: ";
     car.ShowVehicle();
     cout<<"\n";
-    EmergencyVehicle ambulance(102, "Ambulance", 2);
-    ambulance.ShowEmergencyVehicle();
+
+    cout<<"Bike: ";
+    bike.ShowVehicle();
     cout<<"\n";
 
-    cout<<"Inherited ID: "<<ambulance.getID()<<endl;
-    cout<<"Priority Level: "<<ambulance.getPriorityLvl()<<endl;
+    cout<<"Bus: ";
+    bus.ShowVehicle();
+    cout<<"\n";
+
+    //Emergency Vehicle(EV)
+    cout<<"EV: ";
+    ambu.ShowEmergencyVehicle();
+    cout<<"\n";
+
+    cout<<"EV: ";
+    fireT.ShowEmergencyVehicle();
+    cout<<"\n";
+
+    cout<<"EV: ";
+    ambu2.ShowEmergencyVehicle();
+    cout<<"\n";
 
 
 
