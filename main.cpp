@@ -16,22 +16,10 @@ struct EmergencyRequest{
     string label;
 };
 
-//comparison
-struct EmergencyComparison{
-    bool operator()(const EmergencyRequest& a, const EmergencyRequest& b){
-        if(a.priorityLVL == b.priorityLVL){
-
-            return a.arrivalTime > b.arrivalTime;
-        }
-
-        return a.priorityLVL < b.priorityLVL;
-    }
-};
-
+//# 1: OOP #
 //Vehicle class
 class Vehicle{
-    private:
-        int vehID;
+    int vehID;
     public:
         //constructor
         Vehicle(int id){
@@ -45,7 +33,6 @@ class Vehicle{
         }
 };
 
-
 //Emergency Vehicle class
 class EmergencyVehicle : public Vehicle{
     string type;
@@ -57,7 +44,6 @@ class EmergencyVehicle : public Vehicle{
             priority = p;
         }
         void ShowEmergencyVehicle(){
-            //ShowVehicle();
             cout<<"Emergency Vehicle ID: "<<getID()<<endl;
             cout<<"Type: "<<type<<endl;
             cout<<"Priority: "<<priority<<endl;
@@ -73,14 +59,14 @@ class EmergencyVehicle : public Vehicle{
 };
 
 #include "ArrayPriorityQueue.hpp"
-/*#include "ArrayQueue.hpp"
+#include "ArrayQueue.hpp"
 #include "ArrayStack.hpp"
-#include "SinglyLinkedList.hpp"*/
+#include "SinglyLinkedList.hpp"
 
 int main(){
-    cout<<"\n=================================================="<<endl;
+    cout<<"\n======================================================="<<endl;
     cout<<"ADAPTIVE TRAFFIC SIGNAL AND EMERGENCY VEHICLE SIMULATOR"<<endl;
-    cout<<"==================================================\n"<<endl;
+    cout<<"=======================================================\n"<<endl;
 
     Vehicle car(101);
     Vehicle bike(121);
@@ -89,23 +75,16 @@ int main(){
     EmergencyVehicle fireT(202, "Fire Truck", 2);
     EmergencyVehicle ambu2(221, "Ambulance", 1);
 
-    /*Vehicle car(101);
-    car.ShowVehicle();
-    cout<<"\n";
-    EmergencyVehicle ambulance(102, "Ambulance", 1);
-    ambulance.ShowEmergencyVehicle();*/
-
 //JUNCTIONS:
-    cout<<"# 1: ARRAY #"<<endl;
+    cout<<"# 2: ARRAY #"<<endl;
     
-    Junction junctions[6]={
-        {1, "J1"},
-        {2, "J2"},
-        {3, "J3"},
-        {4, "J4"},
-        {5, "J5"},
-        {6, "J6"}
-    };
+    Junction junctions[6]={ {1, "J1"},
+                            {2, "J2"},
+                            {3, "J3"},
+                            {4, "J4"},
+                            {5, "J5"},
+                            {6, "J6"}};     
+
     cout<<"Junctions Info. :"<<endl;
     for(int i=0; i<6; i++){
         cout<<"Junction ID:"<<junctions[i].junctionID;
@@ -115,12 +94,26 @@ int main(){
     cout<<"------------------------------------\n"<<endl;
 
 //QUEUE of all vehicles at J:
-    cout<<"# 2: QUEUE #\n"<<endl;
+    cout<<"# 3: QUEUE #\n"<<endl;
     
+    ArrayQueue vehicleQ;
+    vehicleQ.enqueue(car.getID());
+    vehicleQ.enqueue(bike.getID());
+    vehicleQ.enqueue(ambu.getID());
+    vehicleQ.enqueue(fireT.getID());
+    vehicleQ.enqueue(bus.getID());
+    vehicleQ.enqueue(ambu2.getID());
+    cout<<"Vehicles At Junction:"<<endl;
+    cout<<"Size: "<<vehicleQ.size()<<endl;
+    cout<<"[ ";
+    vehicleQ.traverse();
+    cout<<"]"<<endl;
+
+    cout<<"\n\n";
     cout<<"------------------------------------\n"<<endl;
 
 //QUEUE of emergency vehicles:
-    cout<<"# 3: PRIORITY QUEUE #\n"<<endl;
+    cout<<"# 4: PRIORITY QUEUE #\n"<<endl;
     
     cout<<"Emergency Vehicles Coming!!\n"<<endl;
     ArrayPriorityQueue EmergencyQ;
@@ -130,64 +123,77 @@ int main(){
 
     //emergency requests pushed into P.Queue
     EmergencyQ.push(r1);EmergencyQ.push(r2);EmergencyQ.push(r3);
-    cout<<"Emergency Requests Added!!\n\n"<<endl;
+    cout<<"Emergency Requests Added!!"<<endl;
 
-    cout<<"Emergency Vehicles Going!!!\n"<<endl;
+    cout<<"\n\n";
+    cout<<"------------------------------------\n"<<endl;
+
+//Vehicle Going from J
+    cout<<"============================"<<endl;
+    cout<<"VEHICLES GOING FROM JUNCTION"<<endl;
+    cout<<"============================\n"<<endl;
+
+    cout<<"Emergency Vehicle Going From Junction:"<<endl;
     while(!EmergencyQ.isEmpty()){
-        EmergencyRequest topReq = EmergencyQ.top();
-        cout<<"Vehicle ID: "<<topReq.vehicleID<<", Priority Level: "<<topReq.priorityLVL<<", Arrival Time: "<<topReq.arrivalTime<<", Label: "<<topReq.label<<endl;
+        EmergencyRequest topRequest = EmergencyQ.top();
+        cout<<"Vehicle ID: "<<topRequest.vehicleID<<endl;
+        cout<<"Type: "<<topRequest.label<<endl;
+        cout<<"Priority Level: "<<topRequest.priorityLVL<<endl;
+        cout<<"Arrival Time: "<<topRequest.arrivalTime<<endl;
+
+        cout<<"\n";
         EmergencyQ.pop();
+        vehicleQ.remove(topRequest.vehicleID);
+    }
+    cout<<"\n\n";
+    cout<<"Normal Vehicles Going From Junction:"<<endl;
+    while(!vehicleQ.isempty()){
+        cout<<"Vehicle ID: "<<vehicleQ.dequeue()<<endl;
+        cout<<"\n";
     }
 
-    cout<<"\n";
+    cout<<"\n\n";
     cout<<"------------------------------------\n"<<endl;
 
 //ROUTE:
-    cout<<"#4: LINKED LIST #\n"<<endl;
+    cout<<"#5: LINKED LIST #\n"<<endl;
    
+    SinglyLinkedList route;
 
+    route.pushBack(junctions[0].junctionID);
+    route.pushBack(junctions[2].junctionID);
+    route.pushBack(junctions[4].junctionID);
+    route.pushBack(junctions[5].junctionID);
 
+    cout<<"Planned Route for EV:"<<endl;
+    route.traverse();
+
+    cout<<"\n\n";
     cout<<"------------------------------------\n"<<endl;
 
 
 //ROUTE HISTORY:
-    cout<<"# 5: STACK #\n"<<endl; 
+    cout<<"# 6: STACK #\n"<<endl; 
 
+    ArrayStack routeHist;
 
+    cout<<"Route History of EV:"<<endl;
+    SinglyLinkedList::Node* point=route.getHead();
+    while(point!=nullptr){
+        routeHist.push(point->data);
+        point=point->next;
+    }
+
+    while(!routeHist.isEmpty()){
+        int junctionID=routeHist.pop();
+        cout<<junctions[junctionID-1].name<<" ";
+        if(!routeHist.isEmpty()){
+            cout<<" <-  ";
+        }
+    }
+
+    cout<<"\n\n";
     cout<<"------------------------------------\n"<<endl;
-
-
-//CONCEPT OF OOP:
-    cout<<"# 6: OOP #"<<endl;
-
-    cout<<"===================="<<endl;
-    cout<<"Vehicle Info."<<endl;
-    cout<<"====================\n"<<endl;
-    cout<<"Car: ";
-    car.ShowVehicle();
-    cout<<"\n";
-
-    cout<<"Bike: ";
-    bike.ShowVehicle();
-    cout<<"\n";
-
-    cout<<"Bus: ";
-    bus.ShowVehicle();
-    cout<<"\n";
-
-    //Emergency Vehicle(EV)
-    cout<<"EV: ";
-    ambu.ShowEmergencyVehicle();
-    cout<<"\n";
-
-    cout<<"EV: ";
-    fireT.ShowEmergencyVehicle();
-    cout<<"\n";
-
-    cout<<"EV: ";
-    ambu2.ShowEmergencyVehicle();
-    cout<<"\n";
-
-
+    return 0;
 
 }
