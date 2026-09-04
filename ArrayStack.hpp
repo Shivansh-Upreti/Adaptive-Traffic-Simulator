@@ -37,7 +37,7 @@ class ArrayStack{
             return value;
         }
 
-        int top(){
+        int getTop(){
             if (isEmpty()){
                 return -1;
             }

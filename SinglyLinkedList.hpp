@@ -41,6 +41,25 @@ class SinglyLinkedList{
             return head;
         }
 
+        void traverse(){
+            if(isEmpty()){
+                cout<<"Route is Empty!!"<<endl;
+                return;
+            }
+
+            Node* temp = head;
+            while (temp != nullptr){
+                if(temp->next==nullptr){
+                    cout<<temp->data;
+                    break;
+                }
+                cout<<temp->data<<" -> ";
+                temp = temp->next;
+
+            }
+        }
+
+
         void clear(){
             Node* current = head;
             while (current != nullptr){
