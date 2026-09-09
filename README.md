@@ -2,7 +2,7 @@
 
 This project is a C++ based simulation designed to manage traffic flow at junctions while dynamically prioritizing emergency vehicles. 
 
-Currently in **Phase 1**, the project establishes the foundational Object-Oriented design and core data structures required for the simulation environment.
+**Phase 1** Completed, the project establishes the foundational Object-Oriented design and core data structures required for the simulation environment.
 
 ## Current Implementation (Phase 1)
 * **Object-Oriented Programming (OOP):** Utilizes classes and inheritance to differentiate standard `Vehicle` objects from `EmergencyVehicle` objects.
