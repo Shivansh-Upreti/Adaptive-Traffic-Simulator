@@ -12,7 +12,7 @@ This project is a C++ based simulation designed to manage traffic flow at juncti
 * **Linked Lists:** Designed to track active vehicle routes dynamically.
 * **Stacks:** Maintained to store a history of traversed junctions for route logging and backtracking.
 
-## Roadmap (Phase 2)
+## (Phase 2)- In Progress
 * **Graphs & Shortest Path Algorithms:** Modeling the entire city grid as a graph network to dynamically calculate the most efficient, shortest path for emergency routing.
 
 ## How to Compile and Run
