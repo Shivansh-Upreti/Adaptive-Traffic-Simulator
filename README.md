@@ -14,6 +14,7 @@ This project is a C++ based simulation designed to manage traffic flow at juncti
 
 ## (Phase 2)- In Progress
 * **Graphs & Shortest Path Algorithms:** Modeling the entire city grid as a graph network to dynamically calculate the most efficient, shortest path for emergency routing.
+* Added prototype of Graph road network in main.cpp
 
 ## How to Compile and Run
 ```bash
