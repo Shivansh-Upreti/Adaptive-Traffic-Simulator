@@ -158,7 +158,7 @@ int main(){
 //ROUTE:
     cout<<"#5: LINKED LIST #\n"<<endl;
    
-    SinglyLinkedList route;
+     SinglyLinkedList route;
 
     route.pushBack(junctions[0].junctionID);
     route.pushBack(junctions[2].junctionID);
@@ -168,6 +168,7 @@ int main(){
     cout<<"Planned Route for EV:"<<endl;
     route.traverse();
 
+    
     cout<<"\n\n";
     cout<<"------------------------------------\n"<<endl;
 
@@ -194,6 +195,25 @@ int main(){
 
     cout<<"\n\n";
     cout<<"------------------------------------\n"<<endl;
-    return 0;
 
+
+//ROAD NETWORK:
+    cout<<"# 7: GRAPH #\n"<<endl; 
+
+    Graph roadNetwork(6);
+    roadNetwork.addRoad(1, 2, 5);
+    roadNetwork.addRoad(1, 3, 3);
+    roadNetwork.addRoad(1, 4, 9);
+    roadNetwork.addRoad(2, 3, 2);
+    roadNetwork.addRoad(3, 4, 4);
+    roadNetwork.addRoad(4, 5, 6);
+    roadNetwork.addRoad(5, 6, 3);
+
+    cout<<"Road Network:"<<endl;
+    roadNetwork.showNetwork(junctions);
+
+    cout<<"\n\n";
+    cout<<"------------------------------------\n"<<endl;
+
+    return 0;
 }

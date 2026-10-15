@@ -2,7 +2,7 @@
 
 This project is a C++ based simulation designed to manage traffic flow at junctions while dynamically prioritizing emergency vehicles. 
 
-Currently in **Phase 1**, the project establishes the foundational Object-Oriented design and core data structures required for the simulation environment.
+**Phase 1** Completed, the project establishes the foundational Object-Oriented design and core data structures required for the simulation environment.
 
 ## Current Implementation (Phase 1)
 * **Object-Oriented Programming (OOP):** Utilizes classes and inheritance to differentiate standard `Vehicle` objects from `EmergencyVehicle` objects.
@@ -12,8 +12,9 @@ Currently in **Phase 1**, the project establishes the foundational Object-Orient
 * **Linked Lists:** Designed to track active vehicle routes dynamically.
 * **Stacks:** Maintained to store a history of traversed junctions for route logging and backtracking.
 
-## Roadmap (Phase 2)
+## (Phase 2)- In Progress
 * **Graphs & Shortest Path Algorithms:** Modeling the entire city grid as a graph network to dynamically calculate the most efficient, shortest path for emergency routing.
+* Added prototype of Graph road network in main.cpp
 
 ## How to Compile and Run
 ```bash
