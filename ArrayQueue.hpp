@@ -1,7 +1,7 @@
 #pragma once 
 
 class ArrayQueue { 
-    int queue[32]; 
+    int queue[32];
     int front; 
     int rear; 
     public: 
@@ -15,13 +15,23 @@ class ArrayQueue {
         }
 
         bool isFull(){ 
-            return rear == 31; 
+            return size() == 32; 
         }
 
         void enqueue(int x){ 
             if(isFull()){
                 cout<<"Queue is Full"<<endl; 
                 return; 
+            }
+            // rear reached the end of the array but there is space at the front
+            // (vehicles already left), so shift everyone back to index 0 first
+            if(rear == 31){
+                int count = size();
+                for(int i = 0; i < count; i++){
+                    queue[i] = queue[front + i];
+                }
+                front = 0;
+                rear = count - 1;
             }
             rear++; 
             queue[rear]=x; 
