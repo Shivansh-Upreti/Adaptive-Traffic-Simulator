@@ -23,6 +23,7 @@ class ArrayQueue {
                 cout<<"Queue is Full"<<endl; 
                 return; 
             }
+            
             // rear reached the end of the array but there is space at the front
             // (vehicles already left), so shift everyone back to index 0 first
             if(rear == 31){
