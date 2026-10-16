@@ -73,7 +73,7 @@ int main(){
     Vehicle* fleet[6] = {&car, &bike, &bus, &ambu, &fireT, &ambu2};
 
 //JUNCTIONS:
-    cout<<"# 2: ARRAY #"<<endl;
+    cout<<"# ARRAY #"<<endl;
     
     Junction junctions[6]={ {1, "J1"},
                             {2, "J2"},
@@ -90,112 +90,8 @@ int main(){
     cout<<"\n";
     cout<<"------------------------------------\n"<<endl;
 
-//QUEUE of all vehicles at J:
-    cout<<"# 3: QUEUE #\n"<<endl;
-    
-    ArrayQueue vehicleQ;
-    vehicleQ.enqueue(car.getID());
-    vehicleQ.enqueue(bike.getID());
-    vehicleQ.enqueue(ambu.getID());
-    vehicleQ.enqueue(fireT.getID());
-    vehicleQ.enqueue(bus.getID());
-    vehicleQ.enqueue(ambu2.getID());
-    cout<<"Vehicles At Junction:"<<endl;
-    cout<<"Size: "<<vehicleQ.size()<<endl;
-    cout<<"[ ";
-    vehicleQ.traverse();
-    cout<<"]"<<endl;
-
-    cout<<"\n\n";
-    cout<<"------------------------------------\n"<<endl;
-
-//QUEUE of emergency vehicles:
-   cout<<"# 4: PRIORITY QUEUE #\n"<<endl;
-    
-    cout<<"Emergency Vehicles Coming!!\n"<<endl;
-    ArrayPriorityQueue EmergencyQ;
-    EmergencyRequest r1 = {ambu.getID(), ambu.getPriorityLvl(), 1000, ambu.getType()};
-    EmergencyRequest r2 = {fireT.getID(), fireT.getPriorityLvl(), 2000, fireT.getType()};
-    EmergencyRequest r3 = {ambu2.getID(), ambu2.getPriorityLvl(), 1500, ambu2.getType()};
-
-    //emergency requests pushed into P.Queue
-    EmergencyQ.push(r1);EmergencyQ.push(r2);EmergencyQ.push(r3);
-    cout<<"Emergency Requests Added!!"<<endl;
-
-    cout<<"\n\n";
-    cout<<"------------------------------------\n"<<endl;
-
-//Vehicle Going from J
-    cout<<"============================"<<endl;
-    cout<<"VEHICLES GOING FROM JUNCTION"<<endl;
-    cout<<"============================\n"<<endl;
-
-    cout<<"Emergency Vehicle Going From Junction:"<<endl;
-    while(!EmergencyQ.isEmpty()){
-        EmergencyRequest topRequest = EmergencyQ.top();
-        cout<<"Vehicle ID: "<<topRequest.vehicleID<<endl;
-        cout<<"Type: "<<topRequest.label<<endl;
-        cout<<"Priority Level: "<<topRequest.priorityLVL<<endl;
-        cout<<"Arrival Time: "<<topRequest.arrivalTime<<endl;
-
-        cout<<"\n";
-        EmergencyQ.pop();
-        vehicleQ.remove(topRequest.vehicleID);
-    }
-    cout<<"\n\n";
-    cout<<"Normal Vehicles Going From Junction:"<<endl;
-    while(!vehicleQ.isempty()){
-        cout<<"Vehicle ID: "<<vehicleQ.dequeue()<<endl;
-        cout<<"\n";
-    }
-
-    cout<<"\n\n";
-    cout<<"------------------------------------\n"<<endl;
-
-//ROUTE:
-    cout<<"#5: LINKED LIST #\n"<<endl;
-   
-     SinglyLinkedList route;
-
-    route.pushBack(junctions[0].junctionID);
-    route.pushBack(junctions[2].junctionID);
-    route.pushBack(junctions[4].junctionID);
-    route.pushBack(junctions[5].junctionID);
-
-    cout<<"Planned Route for EV:"<<endl;
-    route.traverse();
-
-    
-    cout<<"\n\n";
-    cout<<"------------------------------------\n"<<endl;
-
-
-//ROUTE HISTORY:
-    cout<<"# 6: STACK #\n"<<endl; 
-
-    ArrayStack routeHist;
-
-    cout<<"Route History of EV:"<<endl;
-    SinglyLinkedList::Node* point=route.getHead();
-    while(point!=nullptr){
-        routeHist.push(point->data);
-        point=point->next;
-    }
-
-    while(!routeHist.isEmpty()){
-        int junctionID=routeHist.pop();
-        cout<<junctions[junctionID-1].name<<" ";
-        if(!routeHist.isEmpty()){
-            cout<<" <-  ";
-        }
-    }
-
-    cout<<"\n\n";
-    cout<<"------------------------------------\n"<<endl;
-
-
 //ROAD NETWORK:
-    cout<<"# 7: GRAPH #\n"<<endl; 
+    cout<<"# GRAPH #\n"<<endl; 
 
     Graph city(6);
     city.addRoad(1, 2, 5);
@@ -222,7 +118,7 @@ int main(){
     cout<<"\n------------------------------------\n"<<endl;
 
 //Vehicle routing:
-    cout<<"# 8: TRAFFIC FLOW AT JUNCTIONS #\n"<<endl;
+    cout<<"# TRAFFIC FLOW AT JUNCTIONS #\n"<<endl;
 
     vehicleArrive(1, car.getID());
     vehicleArrive(1, bike.getID());
@@ -265,7 +161,63 @@ int main(){
     cout<<"\n------------------------------------\n"<<endl;
 
 //Emergency Vehicle routing:
-    cout<<"# 9: EMERGENCY DISPATCH #\n"<<endl;
+    cout<<"# EMERGENCY DISPATCH #\n"<<endl;
 
+    ArrayPriorityQueue EmergencyQ;
+    EmergencyRequest r1 = {ambu.getID(),  ambu.getPriorityLvl(),  1000, ambu.getType(),  1, 6};
+    EmergencyRequest r2 = {fireT.getID(), fireT.getPriorityLvl(), 2000, fireT.getType(), 3, 6};
+    EmergencyRequest r3 = {ambu2.getID(), ambu2.getPriorityLvl(), 1500, ambu2.getType(), 5, 1};
+    EmergencyQ.push(r1);
+    EmergencyQ.push(r2);
+    EmergencyQ.push(r3);
+
+    while(!EmergencyQ.isEmpty()){
+        EmergencyRequest req = EmergencyQ.top();
+        EmergencyQ.pop();
+
+        cout<<"-----------------------"<<endl;
+        Vehicle* v = findVehicle(fleet, 6, req.vehicleID);
+        v->ShowVehicle();
+        if(v->mustWait()){
+            cout<<"This vehicle waits in the queue"<<endl;
+        }
+        else{
+            cout<<"This vehicle skips the queue"<<endl;
+        }
+        cout<<"Going from J"<<req.from<<" to J"<<req.to<<endl;
+
+        //shortest path,then put it into a linked list
+        int dist[7] = {0};
+        int prev[7] = {0};
+        SinglyLinkedList& path = v->getRoute();
+        city.dijkstra(req.from, dist, prev);
+        if(!city.buildRoute(req.to, dist, prev, path)){
+            cout<<"No route found!"<<endl;
+            continue;
+        }
+        cout<<"Shortest distance: "<<dist[req.to]<<endl;
+        cout<<"Route (stored in the vehicle): ";
+        path.traverse();
+        cout<<endl;
+
+        cout<<"\nQueues before the run:"<<endl;
+        RouteHistory history;
+        vehicleArrive(req.from, req.vehicleID);     //joins the back of the queue
+        showAllQueues();
+
+        cout<<"\nDriving:"<<endl;
+        driveEmergency(city, *v, history);
+
+        cout<<"\nRoute History (latest first): ";
+        history.showNewestFirst();
+        cout<<endl;
+        path.clear();
+    }
+
+    cout<<"-----------------------"<<endl;
+    cout<<"Queues at the end:"<<endl;
+    showAllQueues();
+
+    cout<<"\n------------------------------------\n"<<endl;
     return 0;
 }
