@@ -2,60 +2,15 @@
 #include <string>
 using namespace std;
 
+//#1: OOP#
+#include "Vehicle.hpp"
+#include "EmergencyVehicle.hpp"
+#include "EmergencyRequest.hpp"
+
 //junction node
 struct Junction{
     int junctionID;
     string name;
-};
-
-//emergency request info
-struct EmergencyRequest{
-    int vehicleID;
-    int priorityLVL;
-    long long arrivalTime;
-    string label;
-};
-
-//# 1: OOP #
-//Vehicle class
-class Vehicle{
-    int vehID;
-    public:
-        //constructor
-        Vehicle(int id){
-            vehID = id;
-        }
-        void ShowVehicle(){
-            cout<<"Vehicle ID: "<<vehID<<endl;
-        }
-        int getID(){
-            return vehID;
-        }
-};
-
-//Emergency Vehicle class
-class EmergencyVehicle : public Vehicle{
-    string type;
-    int priority;
-    public:
-        //constructor
-        EmergencyVehicle(int id, string t, int p): Vehicle(id){
-            type = t;
-            priority = p;
-        }
-        void ShowEmergencyVehicle(){
-            cout<<"Emergency Vehicle ID: "<<getID()<<endl;
-            cout<<"Type: "<<type<<endl;
-            cout<<"Priority: "<<priority<<endl;
-        }
-        string getType(){
-            return type;
-        }
-        int getPriorityLvl(){
-            return priority;
-        }
-
-
 };
 
 #include "ArrayPriorityQueue.hpp"
@@ -64,6 +19,46 @@ class EmergencyVehicle : public Vehicle{
 #include "SinglyLinkedList.hpp"
 #include "Graph.hpp"
 #include "TrafficFlow.hpp"
+#include "RouteHistory.hpp"
+
+//finds a vehicle in the fleet using its id
+Vehicle* findVehicle(Vehicle* fleet[], int n, int id){
+    for(int i=0; i<n; i++){
+        if(fleet[i]->getID() == id){
+            return fleet[i];
+        }
+    }
+    return nullptr;
+}
+
+//drives a vehicle along its own route (linked list), one road at a time,
+//and records every junction in its route history
+void driveEmergency(Graph &city, Vehicle &v, RouteHistory &history){
+    int vehID = v.getID();
+    SinglyLinkedList::Node* cur = v.getRoute().getHead();
+
+    //vehicle is already standing in the queue of its first junction
+    history.recordVisit(cur->data);
+
+    while(cur->next != nullptr){
+        int from = cur->data;
+        int to = cur->next->data;
+
+        if(!city.hasRoad(from, to)){
+            cout<<"No road between J"<<from<<" and J"<<to<<", vehicle stopped!"<<endl;
+            return;
+        }
+        moveEmergency(from, to, vehID);
+        history.recordVisit(to);
+        cur = cur->next;
+    }
+
+    //reached the destination, so it leaves the network
+    junctionQ[cur->data - 1].remove(vehID);
+    cout<<"Vehicle "<<vehID<<" reached J"<<cur->data<<endl;
+}
+
+
 int main(){
     cout<<"\n======================================================="<<endl;
     cout<<"ADAPTIVE TRAFFIC SIGNAL AND EMERGENCY VEHICLE SIMULATOR"<<endl;
@@ -75,6 +70,7 @@ int main(){
     EmergencyVehicle ambu(102, "Ambulance", 1);
     EmergencyVehicle fireT(202, "Fire Truck", 2);
     EmergencyVehicle ambu2(221, "Ambulance", 1);
+    Vehicle* fleet[6] = {&car, &bike, &bus, &ambu, &fireT, &ambu2};
 
 //JUNCTIONS:
     cout<<"# 2: ARRAY #"<<endl;
@@ -114,7 +110,7 @@ int main(){
     cout<<"------------------------------------\n"<<endl;
 
 //QUEUE of emergency vehicles:
-    cout<<"# 4: PRIORITY QUEUE #\n"<<endl;
+   cout<<"# 4: PRIORITY QUEUE #\n"<<endl;
     
     cout<<"Emergency Vehicles Coming!!\n"<<endl;
     ArrayPriorityQueue EmergencyQ;
@@ -267,6 +263,9 @@ int main(){
     cout<<"After they leave, J4 is "<<congestionLevel(4)<<endl;
 
     cout<<"\n------------------------------------\n"<<endl;
+
+//Emergency Vehicle routing:
+    cout<<"# 9: EMERGENCY DISPATCH #\n"<<endl;
 
     return 0;
 }
