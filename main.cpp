@@ -264,5 +264,21 @@ int main(){
 
     cout<<"\n------------------------------------\n"<<endl;
 
+//UNREACHABLE CASE
+    cout<<"# NO ROUTE CASE #\n"<<endl;
+
+    Graph broken(6);
+    broken.addRoad(1, 2, 5);        //only one road, J6 is cut off
+    int d[7] = {0};
+    int p[7] = {0};
+    SinglyLinkedList none;
+    broken.dijkstra(1, d, p);
+    cout<<"Ambulance from J1 to J6 on the broken map:"<<endl;
+    if(!broken.buildRoute(6, d, p, none)){
+        cout<<"No route found, J6 cannot be reached"<<endl;
+    }
+
+    cout<<"\n------------------------------------\n"<<endl;
+
     return 0;
 }
