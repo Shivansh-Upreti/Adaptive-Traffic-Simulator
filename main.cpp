@@ -62,7 +62,7 @@ class EmergencyVehicle : public Vehicle{
 #include "ArrayQueue.hpp"
 #include "ArrayStack.hpp"
 #include "SinglyLinkedList.hpp"
-
+#include "Graph.hpp"
 int main(){
     cout<<"\n======================================================="<<endl;
     cout<<"ADAPTIVE TRAFFIC SIGNAL AND EMERGENCY VEHICLE SIMULATOR"<<endl;
@@ -200,20 +200,29 @@ int main(){
 //ROAD NETWORK:
     cout<<"# 7: GRAPH #\n"<<endl; 
 
-    Graph roadNetwork(6);
-    roadNetwork.addRoad(1, 2, 5);
-    roadNetwork.addRoad(1, 3, 3);
-    roadNetwork.addRoad(1, 4, 9);
-    roadNetwork.addRoad(2, 3, 2);
-    roadNetwork.addRoad(3, 4, 4);
-    roadNetwork.addRoad(4, 5, 6);
-    roadNetwork.addRoad(5, 6, 3);
+    Graph city(6);
+    city.addRoad(1, 2, 5);
+    city.addRoad(1, 3, 4);
+    city.addRoad(2, 4, 4);
+    city.addRoad(3, 4, 5);
+    city.addRoad(3, 5, 5);
+    city.addRoad(4, 5, 4);
+    city.addRoad(2, 6, 6);
+    city.addRoad(4, 6, 5);
+    city.addRoad(5, 6, 7);
+    city.addRoad(7, 2, 5);     //J7 does not exist, this should get rejected
 
-    cout<<"Road Network:"<<endl;
-    roadNetwork.showNetwork(junctions);
+    cout<<"\nRoads (distance in brackets):"<<endl;
+    city.showRoads();
 
-    cout<<"\n\n";
-    cout<<"------------------------------------\n"<<endl;
+    cout<<"\n";
+    int reached = city.bfs(1);
+    city.dfs(1);
+    if(reached == 6){
+        cout<<"All 6 junctions can be reached from J1"<<endl;
+    }
+
+    cout<<"\n------------------------------------\n"<<endl;
 
     return 0;
 }
