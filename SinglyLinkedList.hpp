@@ -58,6 +58,18 @@ class SinglyLinkedList{
 
             }
         }
+
+        void clear(){
+            Node* current = head;
+            while (current != nullptr){
+                Node* next = current->next;
+                delete current;
+                current = next;
+            }
+            head = nullptr;
+            tail = nullptr;
+            size = 0;
+        }
     private:
         Node* head;
         Node* tail;
