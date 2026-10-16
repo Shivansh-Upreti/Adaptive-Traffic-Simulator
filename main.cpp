@@ -63,6 +63,7 @@ class EmergencyVehicle : public Vehicle{
 #include "ArrayStack.hpp"
 #include "SinglyLinkedList.hpp"
 #include "Graph.hpp"
+#include "TrafficFlow.hpp"
 int main(){
     cout<<"\n======================================================="<<endl;
     cout<<"ADAPTIVE TRAFFIC SIGNAL AND EMERGENCY VEHICLE SIMULATOR"<<endl;
@@ -216,11 +217,54 @@ int main(){
     city.showRoads();
 
     cout<<"\n";
-    int reached = city.bfs(1);
+    int reached=city.bfs(1);
     city.dfs(1);
-    if(reached == 6){
+    if(reached==6){
         cout<<"All 6 junctions can be reached from J1"<<endl;
     }
+
+    cout<<"\n------------------------------------\n"<<endl;
+
+//Vehicle routing:
+    cout<<"# 8: TRAFFIC FLOW AT JUNCTIONS #\n"<<endl;
+
+    vehicleArrive(1, car.getID());
+    vehicleArrive(1, bike.getID());
+    vehicleArrive(3, bus.getID());
+    cout<<"Normal vehicles have arrived:"<<endl;
+    showAllQueues();
+
+    cout<<"\nCar 101 wants to go J1 -> J2"<<endl;
+    if(city.hasRoad(1, 2)){
+        moveVehicle(1, 2);
+    }
+    cout<<"Bike 121 wants to go J1 -> J6"<<endl;
+    if(!city.hasRoad(1, 6)){
+        cout<<"There is no direct road from J1 to J6, bike keeps waiting"<<endl;
+    }
+
+    cout<<"\nCar 101 leaves from J2"<<endl;
+    int left = vehicleDepart(2);
+    cout<<"Vehicle "<<left<<" left the network"<<endl;
+    cout<<"Trying to depart from empty J5:"<<endl;
+    vehicleDepart(5);
+    cout<<"Length of J1 queue: "<<queueLength(1)<<endl;
+
+    cout<<"\nQueues now:"<<endl;
+    showAllQueues();
+
+    cout<<"\nTraffic density:"<<endl;
+    showDensity();
+
+    cout<<"\nRush hour, 7 vehicles arrive at J4:"<<endl;
+    for(int id = 301; id <= 307; id++){
+        vehicleArrive(4, id);
+    }
+    cout<<"J4 has "<<queueLength(4)<<" waiting -> "<<congestionLevel(4)<<endl;
+    for(int i = 0; i < 7; i++){
+        vehicleDepart(4);       //rush hour is over
+    }
+    cout<<"After they leave, J4 is "<<congestionLevel(4)<<endl;
 
     cout<<"\n------------------------------------\n"<<endl;
 
