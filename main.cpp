@@ -172,11 +172,11 @@ int main(){
     EmergencyQ.push(r3);
 
     while(!EmergencyQ.isEmpty()){
-        EmergencyRequest req = EmergencyQ.top();
+        EmergencyRequest req=EmergencyQ.top();
         EmergencyQ.pop();
 
         cout<<"-----------------------"<<endl;
-        Vehicle* v = findVehicle(fleet, 6, req.vehicleID);
+        Vehicle* v = findVehicle(fleet,6,req.vehicleID);
         v->ShowVehicle();
         if(v->mustWait()){
             cout<<"This vehicle waits in the queue"<<endl;
@@ -190,8 +190,8 @@ int main(){
         int dist[7] = {0};
         int prev[7] = {0};
         SinglyLinkedList& path = v->getRoute();
-        city.dijkstra(req.from, dist, prev);
-        if(!city.buildRoute(req.to, dist, prev, path)){
+        city.dijkstra(req.from,dist,prev);
+        if(!city.buildRoute(req.to,dist,prev,path)){
             cout<<"No route found!"<<endl;
             continue;
         }
@@ -202,11 +202,11 @@ int main(){
 
         cout<<"\nQueues before the run:"<<endl;
         RouteHistory history;
-        vehicleArrive(req.from, req.vehicleID);     //joins the back of the queue
+        vehicleArrive(req.from,req.vehicleID);     //joins the back of the queue
         showAllQueues();
 
         cout<<"\nDriving:"<<endl;
-        driveEmergency(city, *v, history);
+        driveEmergency(city,*v,history);
 
         cout<<"\nRoute History (latest first): ";
         history.showNewestFirst();
@@ -219,5 +219,50 @@ int main(){
     showAllQueues();
 
     cout<<"\n------------------------------------\n"<<endl;
+
+//Route History and Backtracking:
+    cout<<"# ROUTE HISTORY AND BACKTRACKING #\n"<<endl;
+
+    RouteHistory trip;
+    cout<<"History before any trip:"<<endl;
+    trip.showNewestFirst();
+    cout<<"Backtrack with nothing recorded:"<<endl;
+    trip.backtrack();
+
+    cout<<"\nAmbulance 102 starts at J1 and goes towards J6 through J4"<<endl;
+    vehicleArrive(1,ambu.getID());
+    trip.recordVisit(1);
+    cout<<"Only J1 recorded, try to backtrack:"<<endl;
+    trip.backtrack();
+
+    moveEmergency(1,2,ambu.getID());
+    trip.recordVisit(2);
+    moveEmergency(2,4,ambu.getID());
+    trip.recordVisit(4);
+
+    cout<<"\nHistory in order:     ";
+    trip.showInOrder();
+    cout<<"History latest first: ";
+    trip.showNewestFirst();
+    cout<<"Ambulance is at J"<<trip.currentJunction()<<endl;
+    showAllQueues();
+    //pretend the road ahead of J4 is blocked, so it goes back the way it came
+    cout<<"\nRoad ahead is blocked, ambulance goes back:"<<endl;
+    while(trip.size()>1){
+        int from = trip.currentJunction();
+        int back = trip.backtrack();
+        moveEmergency(from, back, ambu.getID());
+        cout<<"History now: ";
+        trip.showNewestFirst();
+    }
+    cout<<"Backtrack again at the start:"<<endl;
+    trip.backtrack();
+
+    junctionQ[0].remove(ambu.getID());      //ambulance is taken off the road
+    cout<<"\nQueues after the ambulance is removed:"<<endl;
+    showAllQueues();
+
+    cout<<"\n------------------------------------\n"<<endl;
+
     return 0;
 }
