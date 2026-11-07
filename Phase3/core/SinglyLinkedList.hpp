@@ -10,7 +10,6 @@ class SinglyLinkedList{
             int data;
             Node* next;
         };
-
         SinglyLinkedList(){
             head = nullptr;
             tail= nullptr;
