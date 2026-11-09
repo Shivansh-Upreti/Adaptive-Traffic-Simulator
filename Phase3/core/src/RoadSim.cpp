@@ -381,3 +381,192 @@ void RoadSim::enterBox(int slot, int j){
     m.waitTicks = 0;
     m.waitCode = WAIT_NONE;
 }
+
+
+//Junction box exits and entries
+void RoadSim::phaseBoxExits(){
+    for(int j = 1; j <= NUM_JUNCTIONS; j++){
+        if(!box[j].isJunctionOccupied){
+            continue;
+        }
+        int slot = findSlot(box[j].occupantID);
+        if(slot == -1){
+            box[j].isJunctionOccupied = false;      // (cannot happen) never keep a box blocked by a vehicle that does not exist
+            box[j].occupantID = 0;
+            continue;
+        }
+        Mover &m = movers[slot];
+
+        if(m.cur->next == nullptr){                 // j is the destination: the vehicle arrives and is deleted
+            if(m.isEV){
+                statArrivedEV++;
+                log("[ARRIVED] " + who(slot) + " reached " + name(j) + ".");
+            }
+            else{
+                statArrivedNormal++;
+            }
+            removeMover(slot);
+            continue;
+        }
+
+        int n = m.cur->next->data;
+        if(m.isEV){
+            if(road[j][n].evCell[0] != 0){
+                continue;                           // (cannot happen) it simply stays one more tick
+            }
+            road[j][n].evCell[0] = m.veh->getID();
+        }
+        else{
+            if(road[j][n].cell[0] != 0){
+                continue;                           // (cannot happen)
+            }
+            road[j][n].cell[0] = m.veh->getID();
+        }
+        box[j].isJunctionOccupied = false;
+        box[j].occupantID = 0;
+        m.state = MV_ON_ROAD;
+        m.from = j;
+        m.to = n;
+        m.cell = 0;
+        m.cur = m.cur->next;                        // cur now means: the junction it is heading to
+        m.waitTicks = 0;
+    }
+}
+
+void RoadSim::phaseBoxEntries(){
+    for(int j = 1; j <= NUM_JUNCTIONS; j++){
+        // 1. who stands at a stop line (the last cell of a lane) in front of junction j?
+        int evSlots[NUM_JUNCTIONS + 1];
+        int normSlots[NUM_JUNCTIONS + 1];
+        int nEv = 0;
+        int nNorm = 0;
+        for(int a = 1; a <= NUM_JUNCTIONS; a++){
+            int cells = road[a][j].cells;
+            if(cells == 0){
+                continue;
+            }
+            int evId = road[a][j].evCell[cells - 1];
+            if(evId != 0){
+                int s = findSlot(evId);
+                if(s != -1 && ensureRouteOpen(s)){
+                    evSlots[nEv] = s;
+                    nEv++;
+                }
+            }
+            int id = road[a][j].cell[cells - 1];
+            if(id != 0){
+                int s = findSlot(id);
+                if(s != -1 && ensureRouteOpen(s)){
+                    normSlots[nNorm] = s;
+                    nNorm++;
+                }
+            }
+        }
+
+        // 1b. CONFLICT: two or more EVs stand at stop lines of this junction. The custom priority queue
+        //     ranks them: smaller priority number first, earlier arrival on a tie
+        if(nEv >= 2){
+            ArrayPriorityQueue ranking;
+            for(int k = 0; k < nEv; k++){
+                Mover &m = movers[evSlots[k]];
+                EmergencyRequest r = {m.veh->getID(), m.priority, m.arrival, m.label, m.from, m.destination};
+                ranking.push(r);
+            }
+            EmergencyRequest first = ranking.top();
+            ranking.pop();
+            EmergencyRequest second = ranking.top();
+            ranking.pop();
+            EmergencyRequest third = {0, 0, 0, "", 0, 0};      // none, unless a third EV is waiting too
+            if(!ranking.isEmpty()){
+                third = ranking.top();
+            }
+            int key = first.vehicleID * 10000 + second.vehicleID;
+            if(conflictKey[j] != key){              // write it into the log once, not every tick
+                conflictKey[j] = key;
+                statConflicts++;
+                log("[CONFLICT] " + name(j) + ": " + first.label + " " + to_string(first.vehicleID) + " (priority " + to_string(first.priorityLVL)
+                    + ") and " + second.label + " " + to_string(second.vehicleID) + " (priority " + to_string(second.priorityLVL)
+                    + ") arrive together. " + first.label + " " + to_string(first.vehicleID) + " goes first, the other waits at the line.");
+                // the same priority: the queue decided by the EARLIER ARRIVAL TIME (ArrayPriorityQueue, unchanged from Phase 2)
+                if(first.priorityLVL == second.priorityLVL){
+                    statTieBreaks++;
+                    string proof = "[TIE-BREAKER PROVED] Two Priority " + to_string(first.priorityLVL) + " vehicles met at " + name(j)
+                        + ". Vehicle ID " + to_string(first.vehicleID) + " passed first due to earlier arrival time (arrival no. "
+                        + to_string(first.arrivalTime) + " against no. " + to_string(second.arrivalTime) + " for Vehicle ID " + to_string(second.vehicleID) + ").";
+                    log(proof);
+                    if(announceTies){
+                        cout<<proof<<endl;
+                    }
+                }
+            }
+            // the whole queue order, as the priority queue pops it: 1st, 2nd and (if there is one) 3rd
+            long long order = (long long)first.vehicleID * 1000000 + (long long)second.vehicleID * 1000 + third.vehicleID;
+            if(orderKey[j] != order){
+                orderKey[j] = order;
+                string line = "[QUEUE ORDER] " + name(j) + ": 1st " + first.label + " " + to_string(first.vehicleID) + " (priority " + to_string(first.priorityLVL)
+                    + "), 2nd " + second.label + " " + to_string(second.vehicleID) + " (priority " + to_string(second.priorityLVL) + ")";
+                if(third.vehicleID != 0){
+                    line = line + ", 3rd " + third.label + " " + to_string(third.vehicleID) + " (priority " + to_string(third.priorityLVL) + ")";
+                }
+                log(line);
+                if(announceTies){
+                    cout<<line<<endl;
+                }
+            }
+        }
+        else{
+            conflictKey[j] = 0;
+            orderKey[j] = 0;
+        }
+
+        // 2. JUNCTION CLEARANCE: nobody enters while the box was occupied at the start of the tick,
+        //    not even an EV with a green light. (A vehicle that is leaving needs this tick to get out.)
+        if(!boxFreeAtStart[j] || box[j].isJunctionOccupied){
+            for(int k = 0; k < nEv; k++){
+                setWait(evSlots[k], WAIT_BOX, j);
+            }
+            continue;
+        }
+
+        // 3. emergency vehicles first. The custom priority queue picks the winner
+        ArrayPriorityQueue pq;
+        int eligible = 0;
+        for(int k = 0; k < nEv; k++){
+            int code = evEntryCode(evSlots[k], j);
+            if(code == WAIT_NONE){
+                Mover &m = movers[evSlots[k]];
+                EmergencyRequest r = {m.veh->getID(), m.priority, m.arrival, m.label, m.from, m.destination};
+                pq.push(r);
+                eligible++;
+            }
+            else{
+                setWait(evSlots[k], code, j);
+            }
+        }
+        if(eligible > 0){
+            EmergencyRequest best = pq.top();           // the smallest priority number wins (earlier arrival on a tie)
+            if(announceTies){                           // demo only: number the EVs in the order they pass the junction
+                passCount[j]++;
+                string line = "[PASS " + name(j) + "] no. " + to_string(passCount[j]) + ": " + best.label + " " + to_string(best.vehicleID)
+                    + " (priority " + to_string(best.priorityLVL) + ", arrival no. " + to_string(best.arrivalTime) + ") enters " + name(j);
+                log(line);
+                cout<<line<<endl;
+            }
+            enterBox(findSlot(best.vehicleID), j);
+            continue;
+        }
+
+        // 4. normal vehicles: the one that has waited longest goes first
+        int bestNorm = -1;
+        for(int k = 0; k < nNorm; k++){
+            if(normalCanEnter(normSlots[k], j)){
+                if(bestNorm == -1 || movers[normSlots[k]].waitTicks > movers[bestNorm].waitTicks){
+                    bestNorm = normSlots[k];
+                }
+            }
+        }
+        if(bestNorm != -1){
+            enterBox(bestNorm, j);
+        }
+    }
+}
