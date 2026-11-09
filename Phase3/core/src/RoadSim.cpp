@@ -570,3 +570,154 @@ void RoadSim::phaseBoxEntries(){
         }
     }
 }
+
+
+//Lane moves, spawns, patience
+void RoadSim::phaseLaneMoves(){
+    for(int a = 1; a <= NUM_JUNCTIONS; a++){
+        for(int b = 1; b <= NUM_JUNCTIONS; b++){
+            RoadSegment &r = road[a][b];
+            if(r.cells == 0){
+                continue;
+            }
+
+            // ---- normal lane ----
+            bool frozen = road[b][a].activeEVCount > 0;             // an EV drives the opposite way
+            bool crawl = r.activeEVCount > 0;                       // an EV drives on this segment
+            bool mayMove = !frozen && !(crawl && tickCount % 2 != 0);
+            for(int c = r.cells - 1; c >= 0; c--){                  // from the front of the lane to the back
+                int id = r.cell[c];
+                if(id == 0){
+                    continue;
+                }
+                int slot = findSlot(id);
+                if(slot == -1){
+                    continue;
+                }
+                if(mayMove && c < r.cells - 1 && r.cell[c + 1] == 0){
+                    r.cell[c + 1] = id;                             // one cell forward
+                    r.cell[c] = 0;
+                    movers[slot].cell = c + 1;
+                    movers[slot].waitTicks = 0;
+                    movers[slot].lastMoveTick = tickCount;
+                }
+                else{
+                    movers[slot].waitTicks++;
+                    if(frozen){
+                        statFrozenTicks++;
+                    }
+                }
+            }
+
+            // ---- center lane: emergency vehicles, two cells per tick ----
+            // (an EV only stands still for a MORE IMPORTANT EV that drives the opposite way on this road)
+            for(int step = 0; step < EV_CELLS_PER_TICK; step++){
+                for(int c = r.cells - 2; c >= 0; c--){
+                    int id = r.evCell[c];
+                    if(id != 0 && r.evCell[c + 1] == 0){
+                        int slot = findSlot(id);
+                        if(slot != -1 && outrankingEVOnSegment(b, a, slot)){
+                            continue;                               // frozen: the more important EV passes first
+                        }
+                        r.evCell[c + 1] = id;
+                        r.evCell[c] = 0;
+                        if(slot != -1){
+                            movers[slot].cell = c + 1;
+                            movers[slot].waitCode = WAIT_NONE;
+                            movers[slot].lastMoveTick = tickCount;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+void RoadSim::phaseSpawns(){
+    for(int j = 1; j <= NUM_JUNCTIONS; j++){
+        if(spawnQ[j].isempty()){
+            continue;
+        }
+        // an emergency vehicle in the line goes first, and the MOST IMPORTANT one of them
+        // (not simply the first: a less important EV in front must not block a more important one behind it)
+        int pickId = spawnQ[j].at(0);
+        int bestEV = -1;
+        for(int i = 0; i < spawnQ[j].size(); i++){
+            int s = findSlot(spawnQ[j].at(i));
+            if(s != -1 && movers[s].isEV){
+                if(bestEV == -1 || outranks(s, bestEV)){
+                    bestEV = s;
+                }
+            }
+        }
+        if(bestEV != -1){
+            pickId = movers[bestEV].veh->getID();
+        }
+        int slot = findSlot(pickId);
+        if(slot == -1){
+            spawnQ[j].remove(pickId);
+            continue;
+        }
+        if(!ensureRouteOpen(slot)){
+            continue;                               // it was removed
+        }
+        Mover &m = movers[slot];
+        int n = m.cur->next->data;                  // a spawned vehicle always has a first road (start != destination)
+
+        bool canPlace = true;
+        if(m.isEV){
+            // the same rules as at a stop line, and the reason is written into the log
+            int code = WAIT_NONE;
+            if(box[j].isJunctionOccupied){
+                code = WAIT_BOX;
+            }
+            else if(box[j].isReserved && box[j].reservedByID != m.veh->getID() && !reservedByOpposingEV(j, n)){
+                code = WAIT_YIELD;
+            }
+            else if(road[j][n].evCell[0] != 0){
+                code = WAIT_EXIT;
+            }
+            else if(outrankingEVOnSegment(n, j, slot)){
+                code = WAIT_OPPOSITE;
+            }
+            if(code != WAIT_NONE){
+                setWait(slot, code, j);
+                canPlace = false;
+            }
+        }
+        else{
+            if(box[j].isJunctionOccupied || box[j].isReserved || road[j][n].cell[0] != 0 || road[n][j].activeEVCount > 0){
+                canPlace = false;
+            }
+        }
+        if(!canPlace){
+            m.waitTicks++;
+            continue;
+        }
+
+        spawnQ[j].remove(pickId);
+        m.state = MV_ON_ROAD;
+        m.from = j;
+        m.to = n;
+        m.cell = 0;
+        m.cur = m.cur->next;                        // heading to n
+        m.waitTicks = 0;
+        m.waitCode = WAIT_NONE;                     // it is driving now: forget why it waited in the line
+        if(m.isEV){
+            road[j][n].evCell[0] = pickId;
+            commitEdge(j, n, slot);
+        }
+        else{
+            road[j][n].cell[0] = pickId;
+        }
+    }
+}
+
+void RoadSim::phasePatience(){
+    for(int i = 0; i < MAX_MOVERS; i++){
+        if(movers[i].veh != nullptr && !movers[i].isEV && movers[i].waitTicks > PATIENCE_LIMIT){
+            statTimeouts++;
+            removeMover(i);
+        }
+    }
+}
