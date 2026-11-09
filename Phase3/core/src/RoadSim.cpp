@@ -231,3 +231,153 @@ void RoadSim::updateReservations(){
         m.reservedMask = mask;
     }
 }
+
+
+// Priority rules
+void RoadSim::commitEdge(int j, int n, int slot){
+    road[j][n].activeEVCount++;
+    if(road[j][n].activeEVCount == 1){
+        log("[OVERTAKE] " + who(slot) + " enters " + name(j) + " -> " + name(n) + ": normal vehicles move to the shoulders, "
+            + name(n) + " -> " + name(j) + " is frozen.");
+    }
+}
+
+void RoadSim::setWait(int slot, int code, int j){
+    Mover &m = movers[slot];
+    if(m.waitCode == code){
+        return;
+    }
+    m.waitCode = code;
+    if(code == WAIT_BOX){
+        statClearanceWaits++;
+        log("[CLEARANCE] " + who(slot) + " has a green light at " + name(j) + " but the junction box is occupied: it waits at the line.");
+    }
+    else if(code == WAIT_YIELD){
+        statYields++;
+        int holder = box[j].reservedByID;
+        int hs = findSlot(holder);
+        string holderText = "a more important EV";
+        if(hs != -1){
+            holderText = who(hs) + " (priority " + to_string(movers[hs].priority) + ")";
+        }
+        log("[YIELD] " + who(slot) + " (priority " + to_string(m.priority) + ") waits at the line before " + name(j) + ": reserved by " + holderText + ".");
+    }
+    else if(code == WAIT_OPPOSITE){
+        log("[YIELD] " + who(slot) + " waits at " + name(j) + ": another EV is on the opposite lane of the next road.");
+    }
+    else if(code == WAIT_EXIT){
+        log("[WAIT] " + who(slot) + " waits at " + name(j) + ": the cell after the junction is taken.");
+    }
+}
+
+bool RoadSim::outranks(int x, int y){
+    if(movers[x].priority != movers[y].priority){
+        return movers[x].priority < movers[y].priority;
+    }
+    return movers[x].arrival < movers[y].arrival;
+}
+
+bool RoadSim::outrankingEVOnSegment(int a, int b, int slot){
+    if(headOnPass){
+        return false;               // head-on pass mode: opposing EVs never block each other, both drive on (see isPassingHeadOn)
+    }
+    for(int i = 0; i < MAX_MOVERS; i++){
+        if(i == slot || movers[i].veh == nullptr || !movers[i].isEV){
+            continue;
+        }
+        bool there = false;
+        if(movers[i].state == MV_ON_ROAD && movers[i].from == a && movers[i].to == b){
+            there = true;
+        }
+        if(movers[i].state == MV_IN_BOX && movers[i].from == a && movers[i].cur != nullptr
+           && movers[i].cur->next != nullptr && movers[i].cur->next->data == b){
+            there = true;
+        }
+        if(there && outranks(i, slot)){
+            return true;
+        }
+    }
+    return false;
+}
+
+bool RoadSim::reservedByOpposingEV(int j, int n){
+    if(!headOnPass){
+        return false;
+    }
+    int holder = findSlot(box[j].reservedByID);
+    return holder != -1 && movers[holder].state == MV_ON_ROAD && movers[holder].from == n && movers[holder].to == j;
+}
+
+int RoadSim::evEntryCode(int slot, int j){
+    Mover &m = movers[slot];
+    int a = m.from;                 // it stands at the end of the lane a -> j
+    if(box[j].isReserved && box[j].reservedByID != m.veh->getID()){
+        // Yield only to an EV that can really go BEFORE us. If the EV that reserved the junction is
+        // behind us in the same center lane, it cannot pass us, so waiting for it would block both for ever
+        int holder = findSlot(box[j].reservedByID);
+        bool holderIsBehindUs = holder != -1 && movers[holder].state == MV_ON_ROAD
+                                && movers[holder].from == m.from && movers[holder].to == m.to;
+        if(!holderIsBehindUs){
+            return WAIT_YIELD;
+        }
+    }
+    if(outrankingEVOnSegment(j, a, slot)){
+        return WAIT_OPPOSITE;       // a more important EV drives the opposite way on this road: this EV is frozen
+    }
+    if(m.cur->next == nullptr){
+        return WAIT_NONE;           // j is the destination: no exit needed
+    }
+    int n = m.cur->next->data;
+    if(road[j][n].evCell[0] != 0){
+        return WAIT_EXIT;
+    }
+    if(outrankingEVOnSegment(n, j, slot)){
+        return WAIT_OPPOSITE;       // a more important EV drives toward us on the next road
+    }
+    return WAIT_NONE;
+}
+
+bool RoadSim::normalCanEnter(int slot, int j){
+    Mover &m = movers[slot];
+    int a = m.from;
+    if(box[j].isReserved){
+        return false;               // green wave: the junction belongs to an EV
+    }
+    if(road[j][a].activeEVCount > 0){
+        return false;               // an EV drives on the opposite lane: this lane is frozen
+    }
+    if(road[a][j].activeEVCount > 0 && tickCount % 2 != 0){
+        return false;               // an EV is on this lane: normal vehicles crawl (every second tick)
+    }
+    if(m.cur->next == nullptr){
+        return true;
+    }
+    int n = m.cur->next->data;
+    return road[j][n].cell[0] == 0;
+}
+
+void RoadSim::enterBox(int slot, int j){
+    Mover &m = movers[slot];
+    int a = m.from;                 // it comes from the lane a -> j
+    int last = road[a][j].cells - 1;
+
+    if(m.isEV){
+        road[a][j].evCell[last] = 0;
+        road[a][j].activeEVCount--;                     // it leaves segment a -> j ...
+        if(m.cur->next != nullptr){
+            commitEdge(j, m.cur->next->data, slot);     // ... and claims the next one
+        }
+    }
+    else{
+        road[a][j].cell[last] = 0;
+    }
+
+    box[j].isJunctionOccupied = true;
+    box[j].occupantID = m.veh->getID();
+    m.state = MV_IN_BOX;
+    m.from = j;
+    m.to = 0;
+    m.cell = 0;
+    m.waitTicks = 0;
+    m.waitCode = WAIT_NONE;
+}
