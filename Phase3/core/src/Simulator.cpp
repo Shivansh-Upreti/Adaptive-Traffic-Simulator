@@ -1,5 +1,6 @@
 #include "../include/Simulator.hpp"
 
+//foundation
 void Simulator::log(string msg){
     eventLog[logTotal % LOG_SIZE] = msg;
     logTotal++;
@@ -59,4 +60,76 @@ int Simulator::countInLanes(int id){
         }
     }
     return count;
+}
+
+
+//checks
+bool Simulator::laneAvailable(int j){
+    if(laneBusy(j)){
+        log("[ERROR] " + name(j) + " is being cleared for an emergency vehicle. Try again after it has passed.");
+        return false;
+    }
+    if(flow.laneFull(j)){
+        log("[ERROR] The lane at " + name(j) + " is full (" + to_string(QUEUE_CAPACITY) + " vehicles).");
+        return false;
+    }
+    return true;
+}
+
+bool Simulator::checkNewId(int id){
+    if(id < 1 || id > MAX_VEHICLE_ID){
+        log("[ERROR] Vehicle ID must be between 1 and " + to_string(MAX_VEHICLE_ID) + ".");
+        return false;
+    }
+    if(findIndex(id) != -1){
+        log("[ERROR] Vehicle ID " + to_string(id) + " is already in use by a vehicle that is still on the road.");
+        return false;
+    }
+    if(freeSlot() == -1){
+        log("[ERROR] The fleet is full (" + to_string(MAX_FLEET) + " vehicles on the road at the same time).");
+        return false;
+    }
+    return true;
+}
+
+bool Simulator::isEmergencyId(int id){
+    int i = findIndex(id);
+    if(i == -1){
+        return false;
+    }
+    return !fleet[i]->mustWait();       // only emergency vehicles do not have to wait
+}
+
+int Simulator::countParkedEmergency(int j, int skipID){
+    int count = 0;
+    for(int i = 0; i < flow.sideLength(j); i++){
+        int id = flow.sideAt(j, i);
+        if(id != skipID && isEmergencyId(id)){
+            count++;
+        }
+    }
+    return count;
+}
+
+int Simulator::firstNormalInLane(int j){
+    for(int i = 0; i < flow.laneLength(j); i++){
+        int id = flow.laneAt(j, i);
+        if(!isEmergencyId(id)){
+            return id;
+        }
+    }
+    return -1;
+}
+
+string Simulator::routeText(SinglyLinkedList &route){
+    string text = "";
+    SinglyLinkedList::Node* p = route.getHead();     // p walks along the list, one node at a time
+    while(p != nullptr){
+        text = text + "J" + to_string(p->data);
+        if(p->next != nullptr){
+            text = text + " -> ";
+        }
+        p = p->next;
+    }
+    return text;
 }
