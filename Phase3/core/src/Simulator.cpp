@@ -629,3 +629,62 @@ int Simulator::selfCheck(){
     problems += checkRequests();
     return problems;
 }
+
+
+//Getters for the HUD and the tests
+int Simulator::getActiveVehicleID(){
+    if(!dispatchActive){
+        return -1;
+    }
+    return fleet[activeIdx]->getID();
+}
+
+int Simulator::getCurrentJunction(){
+    if(!dispatchActive || routeCur == nullptr){
+        return 0;
+    }
+    return routeCur->data;
+}
+
+int Simulator::getNextJunction(){
+    if(!dispatchActive || routeCur == nullptr || routeCur->next == nullptr){
+        return 0;
+    }
+    return routeCur->next->data;
+}
+
+int Simulator::getRouteJunction(int i){
+    if(!dispatchActive || routeCur == nullptr || i < 0){
+        return 0;
+    }
+    SinglyLinkedList::Node* p = routeCur;       // start at the vehicle's node ...
+    for(int k = 0; k < i && p != nullptr; k++){
+        p = p->next;                            // ... and walk i nodes forward
+    }
+    if(p == nullptr){
+        return 0;
+    }
+    return p->data;
+}
+
+int Simulator::getVehiclePriority(int id){
+    int i = findIndex(id);
+    if(i == -1){
+        return 0;
+    }
+    return fleet[i]->getPriority();
+}
+
+int Simulator::getActivePriority(){
+    if(!dispatchActive){
+        return 0;
+    }
+    return activeReq.priorityLVL;
+}
+
+string Simulator::getRecentEvent(int k){
+    if(k < 0 || k >= LOG_SIZE || k >= logTotal){
+        return "";
+    }
+    return eventLog[(logTotal - 1 - k) % LOG_SIZE];
+}
