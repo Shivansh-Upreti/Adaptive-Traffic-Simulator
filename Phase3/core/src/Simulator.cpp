@@ -527,3 +527,105 @@ bool Simulator::openRoad(int a, int b, int length){
     return true;
 }
 
+
+//State check
+int Simulator::checkLaneContents(){
+    int problems = 0;
+    for(int j = 1; j <= NUM_JUNCTIONS; j++){
+        for(int pass = 0; pass < 2; pass++){        // pass 0 = main lane, pass 1 = side lane
+            int length;
+            if(pass == 0){
+                length = flow.laneLength(j);
+            }
+            else{
+                length = flow.sideLength(j);
+            }
+            for(int k = 0; k < length; k++){
+                int id;
+                if(pass == 0){
+                    id = flow.laneAt(j, k);
+                }
+                else{
+                    id = flow.sideAt(j, k);
+                }
+                int idx = findIndex(id);
+                if(idx == -1){
+                    cout << "[CHECK] Lane of J" << j << " holds id " << id << " but no such vehicle exists." << endl;
+                    problems++;
+                }
+                else if(countInLanes(id) != 1){
+                    cout << "[CHECK] Vehicle " << id << " is in " << countInLanes(id) << " places at once." << endl;
+                    problems++;
+                }
+            }
+        }
+    }
+
+    return problems;
+}
+
+int Simulator::checkNoVanishedVehicles(){
+    int problems = 0;
+    int existing = 0;
+    for(int i = 0; i < MAX_FLEET; i++){
+        if(fleet[i] == nullptr){
+            continue;
+        }
+        existing++;
+        int places = countInLanes(fleet[i]->getID());
+        if(places != 1){
+            cout << "[CHECK] Vehicle " << fleet[i]->getID() << " exists but stands in " << places << " lanes." << endl;
+            problems++;
+        }
+    }
+    if(existing != fleetCount){
+        cout << "[CHECK] The vehicle counter says " << fleetCount << " but " << existing << " vehicles exist." << endl;
+        problems++;
+    }
+
+    return problems;
+}
+
+int Simulator::checkIdleState(){
+    int problems = 0;
+    if(!dispatchActive){
+        for(int j = 1; j <= NUM_JUNCTIONS; j++){
+            if(flow.holdCount(j) != 0){
+                cout << "[CHECK] J" << j << " signal is still held for an emergency vehicle." << endl;
+                problems++;
+            }
+            if(flow.sideLength(j) != 0){
+                cout << "[CHECK] J" << j << " side lane still holds pulled-over vehicles." << endl;
+                problems++;
+            }
+            if(tookHold[j]){
+                cout << "[CHECK] J" << j << " is still marked as held by a finished trip." << endl;
+                problems++;
+            }
+        }
+    }
+
+    return problems;
+}
+
+int Simulator::checkRequests(){
+    int problems = 0;
+    for(int i = 0; i < emergencyQ.size(); i++){
+        if(findIndex(emergencyQ.getAt(i).vehicleID) == -1){
+            cout << "[CHECK] A waiting request belongs to an unknown vehicle." << endl;
+            problems++;
+        }
+    }
+    return problems;
+}
+
+
+//Self-check
+int Simulator::selfCheck(){
+    int problems = 0;
+    problems += checkLaneContents();
+    problems += checkNoVanishedVehicles();
+    problems += checkIdleState();
+    problems += checkRequests();
+    return problems;
+}
