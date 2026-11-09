@@ -224,3 +224,306 @@ bool Simulator::reroute(int from){
     log("[REROUTE] New route: " + routeText(route) + " (distance " + to_string(dist[activeReq.to]) + ")");
     return true;
 }
+
+
+//Constructor and Reset
+Simulator::Simulator() : city(NUM_JUNCTIONS){
+    // reset() looks at these first, so they need a start value
+    for(int i = 0; i < MAX_FLEET; i++){
+        fleet[i] = nullptr;
+    }
+    fleetCount = 0;
+    dispatchActive = false;
+    reset();
+}
+
+void Simulator::reset(){
+    if(dispatchActive){
+        stopTrip("the simulation was reset");   // gives every signal hold back, clears the route
+    }
+    for(int i = 0; i < MAX_FLEET; i++){
+        if(fleet[i] != nullptr){
+            delete fleet[i];    // one delete for every new. Vehicle has a virtual destructor,
+            fleet[i] = nullptr; // so an EmergencyVehicle is destroyed correctly too
+        }
+    }
+    fleetCount = 0;
+
+    flow.reset();
+    emergencyQ.clear();
+    city.clear();               // delete every road ...
+    buildMap();                 // ... and build the starting map again
+    history.clear();
+
+    clockTick = 0;
+    for(int k = 0; k < LOG_SIZE; k++){
+        eventLog[k] = "";
+    }
+    logTotal = 0;
+
+    dispatchActive = false;
+    lastTripArrived = false;
+    activeIdx = -1;
+    activeReq.vehicleID = -1;
+    activeReq.priorityLVL = 0;
+    activeReq.arrivalTime = 0;
+    activeReq.label = "";
+    routeCur = nullptr;
+    lastJunction = 0;
+    for(int j = 0; j <= NUM_JUNCTIONS; j++){
+        tookHold[j] = false;
+    }
+    statBypass = 0;
+    statPreempt = 0;
+    statEvacuated = 0;
+}
+
+
+//Spawning
+bool Simulator::spawnNormal(int id, int j){
+    if(!checkNewId(id)){
+        return false;
+    }
+    if(!validIndex(j)){
+        log("[ERROR] Junction must be between 1 and " + to_string(NUM_JUNCTIONS) + ".");
+        return false;
+    }
+    if(!laneAvailable(j)){
+        return false;
+    }
+
+    Vehicle* v = new Vehicle(id);       // new vehicle on the heap
+    fleet[freeSlot()] = v;              // the first empty slot remembers the address so it can be deleted later
+    fleetCount++;                       // (checkNewId made sure that a free slot exists)
+    flow.vehicleArrive(j, id);          // cannot fail, the lane was checked above
+    log("[SPAWN] Vehicle " + to_string(id) + " (priority " + to_string(NORMAL_PRIORITY) + ") waits at " + name(j) + ".");
+    return true;
+}
+
+bool Simulator::spawnEmergency(int id, int type, int from, int to){
+    if(!checkNewId(id)){
+        return false;
+    }
+    if(type < PRIORITY_AMBULANCE || type > PRIORITY_POLICE){
+        log("[ERROR] Emergency type must be 1 (Ambulance), 2 (Fire Truck) or 3 (Police).");
+        return false;
+    }
+    if(!validIndex(from) || !validIndex(to)){
+        log("[ERROR] Junctions must be between 1 and " + to_string(NUM_JUNCTIONS) + ".");
+        return false;
+    }
+    if(from == to){
+        log("[ERROR] Start and destination are the same junction.");
+        return false;
+    }
+    if(emergencyQ.isFull()){
+        log("[ERROR] " + to_string(PQ_CAPACITY) + " emergency requests are already waiting. Dispatch one first.");
+        return false;
+    }
+    if(!laneAvailable(from)){
+        return false;
+    }
+
+    string label = emergencyTypeName(type);
+    EmergencyVehicle* ev = new EmergencyVehicle(id, label, type);
+    EmergencyRequest req = {id, type, clockTick, label, from, to};
+    clockTick++;
+    emergencyQ.push(req);               // cannot fail, fullness was checked above
+    fleet[freeSlot()] = ev;             // an EmergencyVehicle* fits into a Vehicle* (inheritance)
+    fleetCount++;
+    flow.vehicleArrive(from, id);       // cannot fail, the lane was checked above
+    log("[SPAWN] " + label + " " + to_string(id) + " (priority " + to_string(type) + ") waits at " + name(from)
+        + ", destination " + name(to) + ". Request queued.");
+    return true;
+}
+
+
+//Emergency Trip
+int Simulator::startDispatch(){
+    if(dispatchActive){
+        log("[ERROR] An emergency vehicle is already on the road.");
+        return DISPATCH_FAILED;
+    }
+    if(emergencyQ.isEmpty()){
+        log("[INFO] No emergency request is waiting.");
+        return DISPATCH_NOTHING;
+    }
+
+    EmergencyRequest req = emergencyQ.top();    // lowest priority number, earliest arrival on a tie
+    emergencyQ.pop();
+    int idx = findIndex(req.vehicleID);
+    if(idx == -1){
+        log("[ERROR] The vehicle of this request is not on the road. Request dropped.");
+        return DISPATCH_FAILED;
+    }
+
+    log("[DISPATCH] " + req.label + " " + to_string(req.vehicleID) + " (priority " + to_string(req.priorityLVL) + "): "
+        + name(req.from) + " -> " + name(req.to));
+
+    int dist[7] = {0};
+    int prev[7] = {0};
+    SinglyLinkedList &route = fleet[idx]->getRoute();   // a reference: the list stays inside the vehicle
+    route.clear();
+    city.dijkstra(req.from, dist, prev);
+    if(!city.buildRoute(req.to, dist, prev, route)){
+        log("[NO ROUTE] " + name(req.to) + " cannot be reached from " + name(req.from)
+            + ". Request cancelled, the vehicle stays at " + name(req.from) + ".");
+        return DISPATCH_FAILED;
+    }
+
+    activeIdx = idx;
+    activeReq = req;
+    dispatchActive = true;
+    lastTripArrived = false;
+    routeCur = route.getHead();                         // the vehicle stands on the first node
+    lastJunction = req.from;
+    history.clear();
+    history.recordVisit(req.from);
+    for(int j = 0; j <= NUM_JUNCTIONS; j++){
+        tookHold[j] = false;
+    }
+
+    log("[ROUTE] " + routeText(route) + " (distance " + to_string(dist[req.to]) + ")");
+    prepareJunction(req.from);                          // the start junction is handled like any other
+    return DISPATCH_STARTED;
+}
+
+bool Simulator::stepDispatch(){
+    if(!dispatchActive){
+        return false;
+    }
+    if(routeCur == nullptr){
+        stopTrip("the route was lost");
+        return false;
+    }
+    if(routeCur->next == nullptr){
+        finishTrip();
+        return false;
+    }
+
+    int id = fleet[activeIdx]->getID();
+    int from = routeCur->data;
+    SinglyLinkedList::Node* nxt = routeCur->next;       // the node of the next junction
+    int to = nxt->data;
+
+    // a road can be closed after the route was planned
+    if(!city.hasRoad(from, to)){
+        log("[BLOCKED] The road " + name(from) + " - " + name(to) + " is closed. Looking for another route...");
+        if(!reroute(from)){
+            stopTrip("no other route to " + name(activeReq.to));
+            return false;
+        }
+        return true;        // the move itself is tried again with the new route
+    }
+
+    // the NEXT junction turns green first (or is skipped if empty) ...
+    prepareJunction(to);
+
+    // ... and only then the vehicle moves. all checks first, so a failure changes nothing
+    bool canMove = !flow.laneFull(to) && flow.laneContains(from, id);
+    if(!canMove){
+        cleanupJunction(to);
+        stopTrip("it cannot enter " + name(to));
+        return false;
+    }
+    flow.laneRemove(from, id);
+    if(!flow.vehicleArrive(to, id)){            // cannot fail (checked above), but a vehicle must never vanish
+        flow.vehicleArrive(from, id);
+        cleanupJunction(to);
+        stopTrip("it cannot enter " + name(to));
+        return false;
+    }
+    history.recordVisit(to);
+    routeCur = nxt;                                     // routeCur walks forward along the list
+    lastJunction = to;
+    log("[MOVE] " + activeName() + ": " + name(from) + " -> " + name(to));
+    cleanupJunction(from);                              // it has left 'from': signal back, vehicles return
+
+    if(routeCur->next == nullptr){
+        finishTrip();
+        return false;
+    }
+    return true;
+}
+
+
+//Normal traffic and roads
+bool Simulator::moveNormal(int from, int to){
+    if(!validIndex(from) || !validIndex(to)){
+        log("[ERROR] Junctions must be between 1 and " + to_string(NUM_JUNCTIONS) + ".");
+        return false;
+    }
+    if(from == to){
+        log("[ERROR] Start and destination are the same junction.");
+        return false;
+    }
+    if(!city.hasRoad(from, to)){
+        log("[ERROR] There is no road between " + name(from) + " and " + name(to) + ".");
+        return false;
+    }
+    if(flow.isPreempted(from)){
+        log("[SIGNAL] " + name(from) + " is green for an emergency vehicle; normal traffic is paused.");
+        return false;
+    }
+    int id = firstNormalInLane(from);
+    if(id == -1){
+        log("[ERROR] No normal vehicle is waiting at " + name(from) + ".");
+        return false;
+    }
+    if(!laneAvailable(to)){
+        return false;
+    }
+    flow.laneRemove(from, id);
+    if(!flow.vehicleArrive(to, id)){            // cannot fail (checked above), but a vehicle must never vanish
+        flow.vehicleArrive(from, id);
+        log("[ERROR] Vehicle " + to_string(id) + " could not enter " + name(to) + ".");
+        return false;
+    }
+    log("[MOVE] Vehicle " + to_string(id) + ": " + name(from) + " -> " + name(to));
+    return true;
+}
+
+bool Simulator::departNormal(int j){
+    if(!validIndex(j)){
+        log("[ERROR] Junction must be between 1 and " + to_string(NUM_JUNCTIONS) + ".");
+        return false;
+    }
+    if(flow.isPreempted(j)){
+        log("[SIGNAL] " + name(j) + " is green for an emergency vehicle; normal traffic is paused.");
+        return false;
+    }
+    int id = firstNormalInLane(j);
+    if(id == -1){
+        log("[ERROR] No normal vehicle is waiting at " + name(j) + ".");
+        return false;
+    }
+    flow.laneRemove(j, id);
+    removeVehicle(findIndex(id));               // it left: delete it so its slot and id are free again
+    log("[LEAVE] Vehicle " + to_string(id) + " left the network from " + name(j) + ".");
+    return true;
+}
+
+//Roads
+bool Simulator::closeRoad(int a, int b){
+    if(!city.removeRoad(a, b)){
+        log("[ERROR] There is no road between " + name(a) + " and " + name(b) + " to close.");
+        return false;
+    }
+    log("[ROAD] The road " + name(a) + " - " + name(b) + " is now CLOSED.");
+    return true;
+}
+
+bool Simulator::openRoad(int a, int b, int length){
+    if(!city.isValid(a) || !city.isValid(b) || a == b){
+        log("[ERROR] A road needs two different junctions between 1 and " + to_string(NUM_JUNCTIONS) + ".");
+        return false;
+    }
+    if(length < 1 || length > MAX_ROAD_LENGTH){
+        log("[ERROR] Road length must be between 1 and " + to_string(MAX_ROAD_LENGTH) + ".");
+        return false;
+    }
+    city.addRoad(a, b, length);
+    log("[ROAD] The road " + name(a) + " - " + name(b) + " is now OPEN (length " + to_string(length) + ").");
+    return true;
+}
+
