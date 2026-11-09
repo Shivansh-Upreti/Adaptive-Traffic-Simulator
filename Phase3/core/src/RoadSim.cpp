@@ -1211,3 +1211,138 @@ int RoadSim::selfCheck(){
     problems += checkCounters();
     return problems;
 }
+
+
+//Read-only information (for the window and the tests)
+int RoadSim::getAliveCount(){
+    int count = 0;
+    for(int i = 0; i < MAX_MOVERS; i++){
+        if(movers[i].veh != nullptr){
+            count++;
+        }
+    }
+    return count;
+}
+
+bool RoadSim::isPassingHeadOn(int slot){
+    if(!headOnPass || !isSlotUsed(slot) || !movers[slot].isEV || movers[slot].state != MV_ON_ROAD){
+        return false;
+    }
+    return road[movers[slot].to][movers[slot].from].activeEVCount > 0;
+}
+
+int RoadSim::edgeWaitingCount(int a, int b){
+    if(!validIndex(a) || !validIndex(b)){
+        return 0;
+    }
+    int count = 0;
+    for(int c = 0; c < road[a][b].cells; c++){
+        int id = road[a][b].cell[c];
+        if(id != 0){
+            int s = findSlot(id);
+            if(s != -1 && movers[s].waitTicks > 0){
+                count++;
+            }
+        }
+    }
+    return count;
+}
+
+bool RoadSim::edgePreempted(int a, int b){
+    if(!validIndex(a) || !validIndex(b)){
+        return false;
+    }
+    return road[a][b].activeEVCount > 0 || road[b][a].activeEVCount > 0;
+}
+
+int RoadSim::edgeTravelSeconds(int a, int b){
+    if(!validIndex(a) || !validIndex(b) || !city.hasRoad(a, b)){
+        return 0;
+    }
+    int extra = 0;
+    if(road[a][b].activeEVCount > 0){
+        extra = extra + city.roadLength(a, b) * SECONDS_PER_DISTANCE;
+    }
+    if(road[b][a].activeEVCount > 0){
+        extra = extra + (city.roadLength(a, b) + EV_CELLS_PER_TICK - 1) / EV_CELLS_PER_TICK;
+    }
+    return city.getTravelTime(a, b, edgeWaitingCount(a, b), extra);
+}
+
+int RoadSim::getCells(int a, int b){
+    if(!validIndex(a) || !validIndex(b)) return 0;
+    return road[a][b].cells;
+}
+
+int RoadSim::getActiveEVCount(int a, int b){
+    if(!validIndex(a) || !validIndex(b)) return 0;
+    return road[a][b].activeEVCount;
+}
+
+int RoadSim::getLaneCell(int a, int b, int c){
+    if(!validIndex(a) || !validIndex(b) || c < 0 || c >= road[a][b].cells || c >= MAX_CELLS) return 0;
+    return road[a][b].cell[c];
+}
+
+int RoadSim::getCenterCell(int a, int b, int c){
+    if(!validIndex(a) || !validIndex(b) || c < 0 || c >= road[a][b].cells || c >= MAX_CELLS) return 0;
+    return road[a][b].evCell[c];
+}
+
+int RoadSim::getBoxOccupant(int j){
+    if(!validIndex(j)) return 0;
+    return box[j].occupantID;
+}
+
+int RoadSim::getReservedBy(int j){
+    if(!validIndex(j)) return 0;
+    return box[j].reservedByID;
+}
+
+int RoadSim::getSpawnQueueLength(int j){
+    if(!validIndex(j)) return 0;
+    return spawnQ[j].size();
+}
+
+int RoadSim::getSlotRouteJunction(int slot, int i){
+    if(!isSlotUsed(slot) || i < 0){
+        return 0;
+    }
+    SinglyLinkedList::Node* p = upcomingStart(slot);
+    for(int k = 0; k < i && p != nullptr; k++){
+        p = p->next;
+    }
+    if(p == nullptr){
+        return 0;
+    }
+    return p->data;
+}
+
+bool RoadSim::isOnShoulder(int slot){
+    if(!isSlotUsed(slot) || movers[slot].state != MV_ON_ROAD){
+        return false;
+    }
+    int a = movers[slot].from;
+    int b = movers[slot].to;
+    if(movers[slot].isEV){
+        return outrankingEVOnSegment(b, a, slot);
+    }
+    return road[a][b].activeEVCount > 0 || road[b][a].activeEVCount > 0;
+}
+
+bool RoadSim::isFrozen(int slot){
+    if(!isSlotUsed(slot) || movers[slot].state != MV_ON_ROAD){
+        return false;
+    }
+    if(movers[slot].isEV){
+        return outrankingEVOnSegment(movers[slot].to, movers[slot].from, slot);
+    }
+    return road[movers[slot].to][movers[slot].from].activeEVCount > 0;
+}
+
+string RoadSim::getRecentEvent(int k){
+    if(k < 0 || k >= ROAD_LOG_SIZE || k >= logTotal){
+        return "";
+    }
+    return eventLog[(logTotal - 1 - k) % ROAD_LOG_SIZE];
+}
