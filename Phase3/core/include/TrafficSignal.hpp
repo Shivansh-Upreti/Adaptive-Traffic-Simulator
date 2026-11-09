@@ -25,33 +25,21 @@ class TrafficSignal{
 
         // the emergency vehicle has passed. returns false if there was no hold to give back
         // (so the counter can never go below 0)
-        bool release(){
-            if(emergencyHolds == 0){
-                return false;
-            }
-            emergencyHolds--;
-            return true;
-        }
+        bool release();
 
-        bool isPreempted(){
+        bool isPreempted() const {
             return emergencyHolds > 0;
         }
 
-        int getHolds(){
+        int getHolds() const {
             return emergencyHolds;
         }
 
         // normal vehicles may only leave this junction while there is no emergency hold
-        bool allowsNormalTraffic(){
+        bool allowsNormalTraffic() const {
             return emergencyHolds == 0;
         }
 
-        const char* getName(){
-            if(emergencyHolds > 0){
-                return "EMERGENCY GREEN (cross-traffic paused)";
-            }
-            return "NORMAL";
-        }
 
         void reset(){
             emergencyHolds = 0;

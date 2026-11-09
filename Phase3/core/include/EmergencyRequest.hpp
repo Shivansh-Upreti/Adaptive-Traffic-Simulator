@@ -14,6 +14,6 @@ struct EmergencyRequest{
     int priorityLVL;
     long long arrivalTime;
     string label;
-    int from = 0;
-    int to = 0;
+    int from = 0;   //phase 2: junction where the vehicle starts
+    int to = 0;     //phase 2: junction where it has to reach
 };

@@ -4,26 +4,17 @@ using namespace std;
 #include "Vehicle.hpp"
 
 // phase 3: name for the type number the evaluator types (1, 2 or 3)
-inline string emergencyTypeName(int type){
-    if(type == PRIORITY_AMBULANCE){
-        return "Ambulance";
-    }
-    if(type == PRIORITY_FIRE_TRUCK){
-        return "Fire Truck";
-    }
-    if(type == PRIORITY_POLICE){
-        return "Police";
-    }
-    return "Unknown";
-}
+string emergencyTypeName(int type);
 
+//Emergency Vehicle class
 class EmergencyVehicle : public Vehicle{
     string type;
     int priority;
     public:
-        EmergencyVehicle(int id, string t, int p): Vehicle(id){
-            type = t;
-            priority = p;
+        EmergencyVehicle(int id, string t, int p);
+        void ShowEmergencyVehicle();
+        void ShowVehicle(){
+            ShowEmergencyVehicle();
         }
         bool mustWait(){
             return false;
@@ -33,5 +24,8 @@ class EmergencyVehicle : public Vehicle{
         }
         string getType(){
             return type;
+        }
+        int getPriorityLvl(){
+            return priority;
         }
 };
