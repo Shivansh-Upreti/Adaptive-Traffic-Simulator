@@ -581,7 +581,7 @@ void RoadSim::phaseLaneMoves(){
                 continue;
             }
 
-            // ---- normal lane ----
+            //normal lane
             bool frozen = road[b][a].activeEVCount > 0;             // an EV drives the opposite way
             bool crawl = r.activeEVCount > 0;                       // an EV drives on this segment
             bool mayMove = !frozen && !(crawl && tickCount % 2 != 0);
@@ -609,7 +609,7 @@ void RoadSim::phaseLaneMoves(){
                 }
             }
 
-            // ---- center lane: emergency vehicles, two cells per tick ----
+            // center lane: emergency vehicles, two cells per tick
             // (an EV only stands still for a MORE IMPORTANT EV that drives the opposite way on this road)
             for(int step = 0; step < EV_CELLS_PER_TICK; step++){
                 for(int c = r.cells - 2; c >= 0; c--){
@@ -720,4 +720,280 @@ void RoadSim::phasePatience(){
             removeMover(i);
         }
     }
+}
+
+
+// Construction and reset
+RoadSim::RoadSim() : city(NUM_JUNCTIONS){
+    for(int i = 0; i < MAX_MOVERS; i++){
+        clearMover(i);          // reset() looks at movers[], so they need a start value
+    }
+    reset();
+}
+
+void RoadSim::reset(){
+    for(int i = 0; i < MAX_MOVERS; i++){
+        if(movers[i].veh != nullptr){
+            movers[i].cur = nullptr;
+            delete movers[i].veh;
+            statDeleted++;
+        }
+        clearMover(i);
+    }
+    for(int a = 0; a <= NUM_JUNCTIONS; a++){
+        for(int b = 0; b <= NUM_JUNCTIONS; b++){
+            road[a][b].cells = 0;
+            road[a][b].activeEVCount = 0;
+            for(int c = 0; c < MAX_CELLS; c++){
+                road[a][b].cell[c] = 0;
+                road[a][b].evCell[c] = 0;
+            }
+        }
+    }
+    for(int j = 0; j <= NUM_JUNCTIONS; j++){
+        box[j].isJunctionOccupied = false;
+        box[j].occupantID = 0;
+        box[j].isReserved = false;
+        box[j].reservedByID = 0;
+        boxFreeAtStart[j] = true;
+        conflictKey[j] = 0;
+        orderKey[j] = 0;
+        passCount[j] = 0;
+        spawnQ[j].clear();
+    }
+    city.clear();
+    buildMap();
+
+    tickCount = 0;
+    arrivalClock = 0;
+    for(int k = 0; k < ROAD_LOG_SIZE; k++){
+        eventLog[k] = "";
+    }
+    logTotal = 0;
+    statCreated = 0;
+    statDeleted = 0;
+    statArrivedNormal = 0;
+    statArrivedEV = 0;
+    statConflicts = 0;
+    statTieBreaks = 0;
+    announceTies = false;
+    headOnPass = false;
+    statYields = 0;
+    statClearanceWaits = 0;
+    statFrozenTicks = 0;
+    statReroutes = 0;
+    statStranded = 0;
+    statTimeouts = 0;
+    statMaxAlive = 0;
+}
+
+//SPAWNING API
+bool RoadSim::spawn(int id, int type, int from, int to, const int* path, int pathLen){
+    if(id < 1 || id > MAX_ROAD_ID){
+        log("[ERROR] Vehicle ID must be between 1 and " + to_string(MAX_ROAD_ID) + ".");
+        return false;
+    }
+    if(findSlot(id) != -1){
+        log("[ERROR] Vehicle ID " + to_string(id) + " is in use by a vehicle that is still on the road.");
+        return false;
+    }
+    if(type < 0 || type > PRIORITY_POLICE){
+        log("[ERROR] Type must be 0 (normal), 1 (Ambulance), 2 (Fire Truck) or 3 (Police).");
+        return false;
+    }
+    if(!validIndex(from) || !validIndex(to)){
+        log("[ERROR] Junctions must be between 1 and " + to_string(NUM_JUNCTIONS) + ".");
+        return false;
+    }
+    if(from == to){
+        log("[ERROR] Start and destination are the same junction.");
+        return false;
+    }
+    int slot = freeMoverSlot();
+    if(slot == -1){
+        log("[ERROR] The road is full (" + to_string(MAX_MOVERS) + " vehicles at the same time). Try again in a moment.");
+        return false;
+    }
+    if(spawnQ[from].isFull()){
+        log("[ERROR] The waiting line at " + name(from) + " is full.");
+        return false;
+    }
+    if(type > 0 && countEVs() >= MAX_ACTIVE_EV){
+        log("[ERROR] " + to_string(MAX_ACTIVE_EV) + " emergency vehicles are on the road already.");
+        return false;
+    }
+
+    Vehicle* v;
+    if(type == 0){
+        v = new Vehicle(id);
+    }
+    else{
+        v = new EmergencyVehicle(id, emergencyTypeName(type), type);   // an EmergencyVehicle* fits into a Vehicle*
+    }
+    statCreated++;
+
+    // the route is stored in the vehicle's own linked list.
+    // Normally it is the shortest path. If 'path' is given (the opposing vehicles of the O key),
+    // exactly that list of junctions is used, after every road of it has been checked
+    bool routeOk;
+    if(path == nullptr){
+        int dist[7] = {0};
+        int prev[7] = {0};
+        city.dijkstra(from, dist, prev);
+        routeOk = city.buildRoute(to, dist, prev, v->getRoute());
+    }
+    else{
+        routeOk = (pathLen >= 2 && path[0] == from && path[pathLen - 1] == to);
+        for(int i = 0; i + 1 < pathLen && routeOk; i++){
+            if(!city.hasRoad(path[i], path[i + 1])){
+                routeOk = false;
+            }
+        }
+        if(routeOk){
+            for(int i = 0; i < pathLen; i++){
+                v->getRoute().pushBack(path[i]);
+            }
+        }
+    }
+    if(!routeOk){
+        delete v;               // nothing else knows this vehicle yet, so deleting it is enough
+        statDeleted++;
+        log("[ERROR] There is no road from " + name(from) + " to " + name(to) + ".");
+        return false;
+    }
+
+    Mover &m = movers[slot];
+    m.veh = v;
+    m.state = MV_QUEUED;
+    m.from = from;
+    m.to = 0;
+    m.cell = 0;
+    m.cur = v->getRoute().getHead();
+    m.destination = to;
+    m.origin = from;
+    m.isEV = (type > 0);
+    if(type > 0){
+        m.priority = type;
+        m.label = emergencyTypeName(type);
+    }
+    else{
+        m.priority = NORMAL_PRIORITY;
+        m.label = "Vehicle";
+    }
+    m.arrival = arrivalClock;
+    arrivalClock++;
+    m.waitTicks = 0;
+    m.waitCode = WAIT_NONE;
+    m.reservedMask = 0;
+    spawnQ[from].enqueue(id);
+
+    if(type > 0){
+        log("[SPAWN] " + who(slot) + " (priority " + to_string(type) + "): " + name(from) + " -> " + name(to) + ".");
+    }
+    return true;
+}
+
+bool RoadSim::spawnEmergency(int id, int type, int from, int to){
+    if(type < PRIORITY_AMBULANCE){
+        log("[ERROR] Emergency type must be 1 (Ambulance), 2 (Fire Truck) or 3 (Police).");
+        return false;
+    }
+    return spawn(id, type, from, to);
+}
+
+bool RoadSim::canReach(int from, int to){
+    if(!validIndex(from) || !validIndex(to)){
+        return false;
+    }
+    int dist[7] = {0};
+    int prev[7] = {0};
+    city.dijkstra(from, dist, prev);
+    return dist[to] != NO_PATH;
+}
+
+bool RoadSim::spawnOpposing(int id, int from, int to){
+    if(!validIndex(from) || !validIndex(to) || from == to){
+        log("[ERROR] Opposing traffic needs two different junctions between 1 and " + to_string(NUM_JUNCTIONS) + ".");
+        return false;
+    }
+    // 1. the route an EV would take (this list lives only inside this function)
+    int dist[7] = {0};
+    int prev[7] = {0};
+    city.dijkstra(from, dist, prev);
+    SinglyLinkedList forward;
+    if(!city.buildRoute(to, dist, prev, forward)){
+        log("[ERROR] There is no road from " + name(from) + " to " + name(to) + ".");
+        return false;
+    }
+    // 2. reverse it with a stack: push every junction, then pop them (last in, first out)
+    ArrayStack stack;
+    SinglyLinkedList::Node* p = forward.getHead();
+    while(p != nullptr){
+        stack.push(p->data);
+        p = p->next;
+    }
+    int path[8];
+    int n = 0;
+    while(!stack.isEmpty() && n < 8){
+        path[n] = stack.pop();
+        n++;
+    }
+    return spawn(id, 0, to, from, path, n);
+}
+
+int RoadSim::latestEVSlot(){
+    int best = -1;
+    for(int i = 0; i < MAX_MOVERS; i++){
+        if(movers[i].veh != nullptr && movers[i].isEV){
+            if(best == -1 || movers[i].arrival > movers[best].arrival){
+                best = i;
+            }
+        }
+    }
+    return best;
+}
+
+//ONE TICK of time
+void RoadSim::tick(){
+    tickCount++;
+    for(int j = 1; j <= NUM_JUNCTIONS; j++){
+        boxFreeAtStart[j] = !box[j].isJunctionOccupied;     // junction clearance looks at THIS snapshot
+    }
+    updateReservations();       // 1. green wave
+    phaseBoxExits();            // 2. vehicles leave the boxes
+    phaseBoxEntries();          // 3. one vehicle per junction enters (EV first, priority queue decides)
+    phaseSpawns();              // 4. waiting vehicles are put on the road (before they drive, so every EV
+                                //    has claimed its segment before anybody moves in the opposite lane)
+    phaseLaneMoves();           // 5. everybody drives forward
+    phasePatience();            // 6. nobody waits for ever
+
+    int alive = getAliveCount();
+    if(alive > statMaxAlive){
+        statMaxAlive = alive;
+    }
+}
+
+//ROADS
+bool RoadSim::closeRoad(int a, int b){
+    if(!city.removeRoad(a, b)){
+        log("[ERROR] There is no road between " + name(a) + " and " + name(b) + " to close.");
+        return false;
+    }
+    log("[ROAD] The road " + name(a) + " - " + name(b) + " is now CLOSED. Vehicles on it finish the road, nobody new enters.");
+    return true;
+}
+
+bool RoadSim::openRoad(int a, int b, int length){
+    if(!city.isValid(a) || !city.isValid(b) || a == b){
+        log("[ERROR] A road needs two different junctions between 1 and " + to_string(NUM_JUNCTIONS) + ".");
+        return false;
+    }
+    if(length < 1 || length > 20){
+        log("[ERROR] Road length must be between 1 and 20.");
+        return false;
+    }
+    city.addRoad(a, b, length);
+    ensureLane(a, b, length);
+    log("[ROAD] The road " + name(a) + " - " + name(b) + " is now OPEN.");
+    return true;
 }
