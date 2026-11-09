@@ -997,3 +997,217 @@ bool RoadSim::openRoad(int a, int b, int length){
     log("[ROAD] The road " + name(a) + " - " + name(b) + " is now OPEN.");
     return true;
 }
+
+
+
+//State Checks
+int RoadSim::checkVehiclePlaces(){
+    int problems = 0;
+    for(int i = 0; i < MAX_MOVERS; i++){
+        Mover &m = movers[i];
+        if(m.veh == nullptr){
+            if(m.state != MV_FREE){
+                cout << "[CHECK] Slot " << i << " is empty but its state is not FREE." << endl;
+                problems++;
+            }
+            continue;
+        }
+        int id = m.veh->getID();
+        int places = 0;
+        for(int a = 1; a <= NUM_JUNCTIONS; a++){
+            for(int b = 1; b <= NUM_JUNCTIONS; b++){
+                for(int c = 0; c < road[a][b].cells; c++){
+                    if(road[a][b].cell[c] == id){
+                        places++;
+                        if(m.state != MV_ON_ROAD || m.isEV || m.from != a || m.to != b || m.cell != c){
+                            cout << "[CHECK] Vehicle " << id << " stands in lane " << a << "->" << b << " cell " << c << " but says something else." << endl;
+                            problems++;
+                        }
+                    }
+                    if(road[a][b].evCell[c] == id){
+                        places++;
+                        if(m.state != MV_ON_ROAD || !m.isEV || m.from != a || m.to != b || m.cell != c){
+                            cout << "[CHECK] EV " << id << " stands in center lane " << a << "->" << b << " cell " << c << " but says something else." << endl;
+                            problems++;
+                        }
+                    }
+                }
+            }
+        }
+        for(int j = 1; j <= NUM_JUNCTIONS; j++){
+            if(box[j].isJunctionOccupied && box[j].occupantID == id){
+                places++;
+                if(m.state != MV_IN_BOX || m.from != j){
+                    cout << "[CHECK] Vehicle " << id << " is in the box of J" << j << " but says something else." << endl;
+                    problems++;
+                }
+            }
+            if(spawnQ[j].contains(id)){
+                places++;
+                if(m.state != MV_QUEUED || m.from != j){
+                    cout << "[CHECK] Vehicle " << id << " waits at J" << j << " but says something else." << endl;
+                    problems++;
+                }
+            }
+        }
+        if(places != 1){
+            cout << "[CHECK] Vehicle " << id << " is in " << places << " places at once." << endl;
+            problems++;
+        }
+
+        // the route pointer must point at a node of the vehicle's OWN list (a dangling pointer would not)
+        if(m.cur == nullptr){
+            cout << "[CHECK] Vehicle " << id << " has no route position." << endl;
+            problems++;
+        }
+        else{
+            bool found = false;
+            SinglyLinkedList::Node* p = m.veh->getRoute().getHead();
+            while(p != nullptr){
+                if(p == m.cur){
+                    found = true;
+                }
+                p = p->next;
+            }
+            if(!found){
+                cout << "[CHECK] Vehicle " << id << ": the route pointer does not point into its route list." << endl;
+                problems++;
+            }
+            else{
+                int expected;
+                if(m.state == MV_ON_ROAD){
+                    expected = m.to;
+                }
+                else{
+                    expected = m.from;
+                }
+                if(m.cur->data != expected){
+                    cout << "[CHECK] Vehicle " << id << ": the route position is J" << m.cur->data << " but it should be J" << expected << "." << endl;
+                    problems++;
+                }
+            }
+        }
+    }
+
+    return problems;
+}
+
+int RoadSim::checkLaneAndBoxIds(){
+    int problems = 0;
+    for(int a = 1; a <= NUM_JUNCTIONS; a++){
+        for(int b = 1; b <= NUM_JUNCTIONS; b++){
+            for(int c = 0; c < road[a][b].cells; c++){
+                if(road[a][b].cell[c] != 0 && findSlot(road[a][b].cell[c]) == -1){
+                    cout << "[CHECK] Lane " << a << "->" << b << " cell " << c << " holds an id that does not exist." << endl;
+                    problems++;
+                }
+                if(road[a][b].evCell[c] != 0 && findSlot(road[a][b].evCell[c]) == -1){
+                    cout << "[CHECK] Center lane " << a << "->" << b << " cell " << c << " holds an id that does not exist." << endl;
+                    problems++;
+                }
+            }
+        }
+    }
+    for(int j = 1; j <= NUM_JUNCTIONS; j++){
+        if(box[j].isJunctionOccupied && findSlot(box[j].occupantID) == -1){
+            cout << "[CHECK] The box of J" << j << " is occupied by a vehicle that does not exist." << endl;
+            problems++;
+        }
+        if(!box[j].isJunctionOccupied && box[j].occupantID != 0){
+            cout << "[CHECK] The box of J" << j << " is empty but remembers an occupant." << endl;
+            problems++;
+        }
+        if(box[j].isReserved != (box[j].reservedByID != 0)){
+            cout << "[CHECK] J" << j << ": isReserved and reservedByID disagree." << endl;
+            problems++;
+        }
+    }
+
+    return problems;
+}
+
+int RoadSim::checkEVCounts(){
+    int problems = 0;
+    for(int a = 1; a <= NUM_JUNCTIONS; a++){
+        for(int b = 1; b <= NUM_JUNCTIONS; b++){
+            int counted = 0;
+            for(int i = 0; i < MAX_MOVERS; i++){
+                Mover &m = movers[i];
+                if(m.veh == nullptr || !m.isEV){
+                    continue;
+                }
+                if(m.state == MV_ON_ROAD && m.from == a && m.to == b){
+                    counted++;
+                }
+                if(m.state == MV_IN_BOX && m.from == a && m.cur != nullptr && m.cur->next != nullptr && m.cur->next->data == b){
+                    counted++;
+                }
+            }
+            if(counted != road[a][b].activeEVCount){
+                cout << "[CHECK] Segment " << a << "->" << b << ": activeEVCount is " << road[a][b].activeEVCount << " but " << counted << " EVs are there." << endl;
+                problems++;
+            }
+        }
+    }
+
+    return problems;
+}
+
+int RoadSim::checkNoHeadOn(){
+    int problems = 0;
+    for(int i = 0; i < MAX_MOVERS; i++){
+        Mover &m = movers[i];
+        if(m.veh == nullptr || m.state != MV_ON_ROAD){
+            continue;
+        }
+        bool mustStand;
+        if(m.isEV){
+            mustStand = outrankingEVOnSegment(m.to, m.from, i);
+        }
+        else{
+            mustStand = road[m.to][m.from].activeEVCount > 0;
+        }
+        if(mustStand && m.lastMoveTick == tickCount){
+            cout << "[CHECK] Vehicle " << m.veh->getID() << " drove forward while an EV came toward it on the same road." << endl;
+            problems++;
+        }
+    }
+
+    return problems;
+}
+
+int RoadSim::checkReservations(){
+    int problems = 0;
+    for(int j = 1; j <= NUM_JUNCTIONS; j++){
+        if(box[j].isReserved){
+            int s = findSlot(box[j].reservedByID);
+            if(s == -1 || !movers[s].isEV){
+                cout << "[CHECK] J" << j << " is reserved by something that is not a living EV." << endl;
+                problems++;
+            }
+        }
+    }
+
+    return problems;
+}
+
+int RoadSim::checkCounters(){
+    int problems = 0;
+    int alive = getAliveCount();
+    if(statCreated - statDeleted != alive){
+        cout << "[CHECK] Created " << statCreated << " - deleted " << statDeleted << " is not " << alive << " alive." << endl;
+        problems++;
+    }
+    return problems;
+}
+
+int RoadSim::selfCheck(){
+    int problems = 0;
+    problems += checkVehiclePlaces();
+    problems += checkLaneAndBoxIds();
+    problems += checkEVCounts();
+    problems += checkNoHeadOn();
+    problems += checkReservations();
+    problems += checkCounters();
+    return problems;
+}
