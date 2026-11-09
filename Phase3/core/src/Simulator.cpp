@@ -133,3 +133,94 @@ string Simulator::routeText(SinglyLinkedList &route){
     }
     return text;
 }
+
+
+//Trip end and Reroute
+void Simulator::prepareJunction(int j){
+    int evID = fleet[activeIdx]->getID();
+    string who = activeName();
+    int waiting = flow.waitingExcept(j, evID);
+
+    if(waiting == 0){
+        // empty junction: no signal request, no evacuation, no overhead
+        statBypass++;
+        log("[BYPASS] " + name(j) + " is empty; " + who + " passed without signal request.");
+        return;
+    }
+
+    flow.preempt(j);
+    tookHold[j] = true;
+    statPreempt++;
+    log("[SIGNAL] " + name(j) + ": preempted green light granted for " + who + "; cross-traffic paused.");
+
+    if(flow.evacuateToSide(j, evID)){
+        statEvacuated = statEvacuated + waiting;
+        // an emergency vehicle that is parked (not dispatched) is pulled over too, but it is not "normal"
+        int parked = countParkedEmergency(j, evID);
+        string text = to_string(waiting - parked) + " normal vehicle(s)";
+        if(parked > 0){
+            text = text + " and " + to_string(parked) + " parked emergency vehicle(s)";
+        }
+        log("[EVACUATION] " + name(j) + ": " + text + " pulled over to side lane. " + who + " passed to front.");
+    }
+    else{
+        log("[EVACUATION] " + name(j) + ": side lane is too full, " + who + " uses the main lane.");
+    }
+}
+
+void Simulator::cleanupJunction(int j){
+    if(!tookHold[j]){
+        return;
+    }
+    int back = flow.restoreFromSide(j);
+    flow.release(j);
+    tookHold[j] = false;
+    if(back > 0){
+        log("[EVACUATION] " + name(j) + ": " + to_string(back) + " vehicle(s) back in the main lane, same order.");
+    }
+    log("[SIGNAL] " + name(j) + " back to normal; cross-traffic released.");
+}
+
+void Simulator::releaseAllHolds(){
+    for(int j = 1; j <= NUM_JUNCTIONS; j++){
+        cleanupJunction(j);
+    }
+}
+
+void Simulator::stopTrip(string reason){
+    log("[STOPPED] " + activeName() + " stopped at " + name(lastJunction) + ": " + reason + ". Request cancelled.");
+    releaseAllHolds();                              // every hold goes back, whatever happened
+    fleet[activeIdx]->getRoute().clear();
+    routeCur = nullptr;                             // the nodes are deleted, so no pointer may still point at them
+    dispatchActive = false;
+}
+
+void Simulator::finishTrip(){
+    int id = fleet[activeIdx]->getID();
+    int dest = routeCur->data;
+    flow.laneRemove(dest, id);                      // it leaves the road network
+    cleanupJunction(dest);
+    log("[ARRIVED] " + activeName() + " reached " + name(dest) + ".");   // (needs the vehicle, so it comes BEFORE the delete)
+    routeCur = nullptr;                             // routeCur points into the vehicle's route list: forget it first
+    dispatchActive = false;
+    lastTripArrived = true;
+    removeVehicle(activeIdx);                       // delete the vehicle: its slot and its id are free again
+    activeIdx = -1;
+}
+
+bool Simulator::reroute(int from){
+    int dist[7] = {0};
+    int prev[7] = {0};
+    SinglyLinkedList &route = fleet[activeIdx]->getRoute();
+
+    city.dijkstra(from, dist, prev);
+    route.clear();              // this DELETES every node of the old route ...
+    routeCur = nullptr;         // ... so routeCur must not keep pointing at them (dangling pointer)
+    if(!city.buildRoute(activeReq.to, dist, prev, route)){
+        log("[NO ROUTE] " + name(activeReq.to) + " cannot be reached from " + name(from) + " any more.");
+        return false;
+    }
+    routeCur = route.getHead(); // the new list starts at the vehicle's current junction
+    log("[REROUTE] New route: " + routeText(route) + " (distance " + to_string(dist[activeReq.to]) + ")");
+    return true;
+}
