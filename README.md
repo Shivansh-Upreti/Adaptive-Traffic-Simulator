@@ -4,6 +4,8 @@
 
 > https://github.com/user-attachments/assets/b2313aa2-f5ce-4966-a692-144030a0c7f6
 
+<sub>Trailer characters are a fan tribute to <i>Omniscient Reader's Viewpoint</i> by sing N song (webtoon by Redice Studio); this project is not affiliated with or endorsed by its creators.</sub>
+
 <p>
 <img width="850" height="860" alt="ATS-Img" src="https://github.com/user-attachments/assets/524da5d5-1606-4b7d-a36a-4abb799d0cc3" />
 </p>
