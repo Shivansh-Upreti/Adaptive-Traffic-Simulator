@@ -1,11 +1,19 @@
-# Phase 3 SFML build (graphical version).
+# Phase 3 SFML build (graphical version) and the tests.
+#
+# Build, then run all tests (the tests need no window):
+#   cmake --build build
+#   ctest --test-dir build --output-on-failure
 #
 # Needs SFML 2.5 or newer 2.x (tested with SFML 2.6.2, MinGW 64-bit, gcc 13.1).
 # If CMake says "Could not find SFML", tell it where SFML is:
 #   cmake -S . -B build -G "MinGW Makefiles" -DSFML_DIR=C:/SFML-2.6.2/lib/cmake/SFML
 # (SFML_DIR is the folder that contains SFMLConfig.cmake)
 #
-# The engine is in ../core. main.cpp includes it with a relative path, so no
+# The engine is split in two folders: ../core/include has the headers (the declarations) and
+# ../core/src has the function bodies, built once as a static library (traffic_core) that the
+# window links. The window's own files are split the same way: include/ has the headers
+# (ViewModel, LiveView, Renderer, LiveRenderer) and src/ has their function bodies, which are
+# compiled together with main.cpp. Everything includes headers with a relative path, so no
 # include directory has to be set.
 cmake_minimum_required(VERSION 3.16)
 project(TrafficSimPhase3SFML LANGUAGES CXX)
@@ -24,10 +32,32 @@ endif()
 
 find_package(SFML 2.5 COMPONENTS graphics window system REQUIRED)
 
-add_executable(traffic_sfml main.cpp)
-target_link_libraries(traffic_sfml PRIVATE sfml-graphics sfml-window sfml-system)
+# the core library: every function body that was moved out of the headers
+set(CORE_SOURCES
+    ../core/src/ArrayPriorityQueue.cpp
+    ../core/src/ArrayQueue.cpp
+    ../core/src/ArrayStack.cpp
+    ../core/src/AuditLog.cpp
+    ../core/src/DemoScene.cpp
+    ../core/src/EmergencyVehicle.cpp
+    ../core/src/Graph.cpp
+    ../core/src/RoadSim.cpp
+    ../core/src/RouteHistory.cpp
+    ../core/src/Simulator.cpp
+    ../core/src/SinglyLinkedList.cpp
+    ../core/src/TrafficFlow.cpp
+    ../core/src/TrafficSignal.cpp)
+add_library(traffic_core STATIC ${CORE_SOURCES})
+
+add_executable(traffic_sfml main.cpp
+    src/ViewModel.cpp
+    src/LiveView.cpp
+    src/Renderer.cpp
+    src/LiveRenderer.cpp)
+target_link_libraries(traffic_sfml PRIVATE traffic_core sfml-graphics sfml-window sfml-system)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(traffic_core PRIVATE -Wall -Wextra)
     target_compile_options(traffic_sfml PRIVATE -Wall -Wextra)
 endif()
 
@@ -43,20 +73,25 @@ foreach(dll sfml-graphics-2 sfml-window-2 sfml-system-2)
     endif()
 endforeach()
 
-# the timeline/key logic is tested WITHOUT a window, so these tests need no SFML library
+# the tests: every engine rule is checked WITHOUT a window (ViewModel and LiveView hold the screen logic,
+# so they are compiled in; nothing of SFML is needed). Run them with ctest.
 enable_testing()
-foreach(t test_view test_stress test_liveview test_roadsim test_roadstress)
-    add_executable(${t} ../tests/${t}.cpp)
-    add_test(NAME ${t} COMMAND ${t})
+foreach(t test_graph test_history test_traffic test_phase3 test_roadsim
+          test_view test_liveview test_stress test_roadstress test_leaks)
+    add_executable(${t} tests/${t}.cpp src/ViewModel.cpp src/LiveView.cpp)
+    target_link_libraries(${t} PRIVATE traffic_core)
+    # the tests write and delete small temporary files: they run inside the build folder
+    add_test(NAME ${t} COMMAND ${t} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(${t} PRIVATE -Wall -Wextra)
     endif()
 endforeach()
 
-# test_stress and test_roadstress count every new and delete. With MinGW the C++ library is a .dll that cannot see
-# the counting new/delete of the program, so the counts would be wrong in optimised builds
+# test_stress, test_roadstress and test_leaks count every new and delete. With MinGW the C++ library is a .dll
+# that cannot see the counting new/delete of the program, so the counts would be wrong in optimised builds
 # (this project builds in Release by default). Linking the library statically fixes that.
 if(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_link_options(test_stress PRIVATE -static)
     target_link_options(test_roadstress PRIVATE -static)
+    target_link_options(test_leaks PRIVATE -static)
 endif()
