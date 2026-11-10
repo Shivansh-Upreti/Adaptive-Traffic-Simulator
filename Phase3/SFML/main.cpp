@@ -8,7 +8,7 @@
 // The window only shows and controls the shared engines in ../core.
 //
 // build (MinGW, SFML 2.6.2 in C:/SFML-2.6.2). CMake does all of this; by hand (Git Bash, from this folder) the program is
-// main.cpp + the 4 files of src/ + the 12 files of ../core/src:
+// main.cpp + the 4 files of src/ + the 13 files of ../core/src:
 //   g++ -std=c++17 -Wall -Wextra -IC:/SFML-2.6.2/include main.cpp src/*.cpp ../core/src/*.cpp -o traffic_sfml -LC:/SFML-2.6.2/lib -lsfml-graphics -lsfml-window -lsfml-system
 // the program needs the three sfml-*-2.dll files from C:/SFML-2.6.2/bin next to it
 #include <SFML/Graphics.hpp>
@@ -33,6 +33,10 @@ using namespace std;
 //                       each one moves to its own side of the road (head-on pass mode), so they pass without clipping
 //   7  JUNCTION ARRIVAL Ambulance A (J3 -> J6) and B (J6 -> J3) enter J4 from OPPOSITE sides in the same tick: the arrival
 //                       time decides who gets the junction first
+//   8  ROAD CLOSED      Ambulance J1 -> J6: the road J1 - J2 closes right after it is created, Dijkstra re-plans it
+//                       onto the detour J1 -> J3 -> J4 -> J6
+//   9  GRIDLOCK         20 normal vehicles jam J5 -> J6, the Ambulance drives down the center (center-overtake)
+//   10 NO WAY THROUGH   (key 0) all roads into J6 close mid-trip: the Ambulance is stopped safely at J2
 //   In 2 - 4 and 7 the equal priority is decided by the EARLIER ARRIVAL TIME: ArrayPriorityQueue (Phase 2) is unchanged.
 // Every scene has 40 ticks of background traffic first (each vehicle with its OWN random destination), never more than
 // 3 emergency vehicles (scene 5: 4), and ENDS BY ITSELF when they have arrived; then D can be pressed again.
@@ -72,6 +76,21 @@ void runMultiEVDemoScene(RoadSim &world, LiveView &view, int scenario){
             cout << "\n===== DEMO 7: SIMULTANEOUS JUNCTION ARRIVAL & TIE-BREAKER =====" << endl;
             cout << "Ambulance A (901) J3 -> J6 and Ambulance B (902) J6 -> J3 enter J4 from opposite sides in the same tick." << endl;
             cout << "Expected: equal priority, so the earlier arrival time decides: 901 gets J4 first." << endl;
+            break;
+        case 8:
+            cout << "\n===== DEMO 8: ROAD CLOSED - DIJKSTRA DETOUR =====" << endl;
+            cout << "Ambulance (901) is planned J1 -> J2 -> J6. The road J1 - J2 closes right after it is created." << endl;
+            cout << "Expected: Dijkstra re-plans it at once onto the detour J1 -> J3 -> J4 -> J6." << endl;
+            break;
+        case 9:
+            cout << "\n===== DEMO 9: GRIDLOCK - CENTER-OVERTAKE =====" << endl;
+            cout << "20 normal vehicles jam the road J5 -> J6, then an Ambulance (901) drives J5 -> J6." << endl;
+            cout << "Expected: the jammed vehicles wait on the shoulders and the Ambulance drives down the center without stopping." << endl;
+            break;
+        case 10:
+            cout << "\n===== DEMO 10: NO WAY THROUGH =====" << endl;
+            cout << "Ambulance (901) starts J1 -> J2 -> J6, then all three roads into J6 close." << endl;
+            cout << "Expected: at J2 it finds no way left and is stopped safely ([STOPPED] in the log), no crash." << endl;
             break;
         default:
             return;                         // not a scenario: nothing to do
