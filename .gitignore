@@ -1,1 +1,4 @@
 *.exe
+# build output and the audit file the program writes at run time
+build/
+ev_audit_log.csv
