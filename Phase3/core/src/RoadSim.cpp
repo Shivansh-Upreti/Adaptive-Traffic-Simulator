@@ -55,12 +55,9 @@ void RoadSim::ensureLane(int a, int b, int length){
 }
 
 void RoadSim::buildMap(){
-    int fromList[9] = {1, 1, 2, 3, 3, 4, 2, 4, 5};
-    int toList[9]   = {2, 3, 4, 4, 5, 5, 6, 6, 6};
-    int lenList[9]  = {5, 4, 4, 5, 5, 4, 6, 5, 7};
-    for(int i = 0; i < 9; i++){
-        city.addRoad(fromList[i], toList[i], lenList[i]);
-        ensureLane(fromList[i], toList[i], lenList[i]);
+    for(int i = 0; i < NUM_ROADS; i++){             // the shared map of CityMap.hpp
+        city.addRoad(ROAD_FROM[i], ROAD_TO[i], ROAD_LENGTH[i]);
+        ensureLane(ROAD_FROM[i], ROAD_TO[i], ROAD_LENGTH[i]);
     }
 }
 
@@ -81,6 +78,8 @@ void RoadSim::clearMover(int i){
     movers[i].waitCode = WAIT_NONE;
     movers[i].reservedMask = 0;
     movers[i].lastMoveTick = -1;
+    movers[i].spawnTick = 0;
+    movers[i].drivenPath = "";
 }
 
 SinglyLinkedList::Node* RoadSim::upcomingStart(int slot){
@@ -150,8 +149,8 @@ bool RoadSim::ensureRouteOpen(int slot){
         return true;
     }
 
-    int dist[7] = {0};
-    int prev[7] = {0};
+    int dist[JUNCTION_SLOTS] = {0};
+    int prev[JUNCTION_SLOTS] = {0};
     city.dijkstra(here, dist, prev);
     SinglyLinkedList &route = m.veh->getRoute();
     route.clear();                  // this DELETES every node of the old route ...
@@ -374,6 +373,7 @@ void RoadSim::enterBox(int slot, int j){
 
     box[j].isJunctionOccupied = true;
     box[j].occupantID = m.veh->getID();
+    m.drivenPath = m.drivenPath + "->" + name(j);      // the junction it REALLY crosses
     m.state = MV_IN_BOX;
     m.from = j;
     m.to = 0;
@@ -401,9 +401,14 @@ void RoadSim::phaseBoxExits(){
             if(m.isEV){
                 statArrivedEV++;
                 log("[ARRIVED] " + who(slot) + " reached " + name(j) + ".");
+                if(auditOn){
+                    // a file that cannot be written is reported by appendEVAuditRow; the traffic goes on
+                    appendEVAuditRow(auditFile, tickCount, m.veh->getID(), m.priority, m.origin, j, m.drivenPath, tickCount - m.spawnTick);
+                }
             }
             else{
                 statArrivedNormal++;
+                statNormalTripTicks += tickCount - m.spawnTick;
             }
             removeMover(slot);
             continue;
@@ -556,8 +561,12 @@ void RoadSim::phaseBoxEntries(){
             continue;
         }
 
-        // 4. normal vehicles: the one that has waited longest goes first
+        // 4. normal vehicles: the one that has waited longest goes first (adaptive signals: the green approach)
         int bestNorm = -1;
+        if(adaptiveSignals){
+            bestNorm = pickNormalAdaptive(j, normSlots, nNorm);
+            nNorm = 0;                                  // the loop below is the old rule: skip it
+        }
         for(int k = 0; k < nNorm; k++){
             if(normalCanEnter(normSlots[k], j)){
                 if(bestNorm == -1 || movers[normSlots[k]].waitTicks > movers[bestNorm].waitTicks){
@@ -573,6 +582,72 @@ void RoadSim::phaseBoxEntries(){
 
 
 //Lane moves, spawns, patience
+//Adaptive signals
+int RoadSim::laneQueue(int a, int j){
+    int count = 0;
+    for(int c = 0; c < road[a][j].cells; c++){
+        if(road[a][j].cell[c] != 0){
+            count++;
+        }
+    }
+    return count;
+}
+
+int RoadSim::greenTicksFor(int queue){
+    if(queue >= 6) return GREEN_TICKS_HEAVY;
+    if(queue >= 3) return GREEN_TICKS_MODERATE;
+    return GREEN_TICKS_LOW;
+}
+
+int RoadSim::pickNormalAdaptive(int j, int normSlots[], int nNorm){
+    // keep the green while its time lasts and somebody still comes on that road;
+    // otherwise give it to the busiest approach (a vehicle waiting MAX_RED_TICKS goes first)
+    int g = greenFrom[j];
+    if(g == 0 || tickCount >= greenUntil[j] || laneQueue(g, j) == 0){
+        int chosen = 0;
+        int bestQueue = -1;
+        int longestWait = -1;
+        for(int k = 0; k < nNorm; k++){
+            int s = normSlots[k];
+            if(!normalCanEnter(s, j)){
+                continue;
+            }
+            int a = movers[s].from;
+            int q = laneQueue(a, j);
+            int w = movers[s].waitTicks;
+            if(w >= MAX_RED_TICKS){
+                q = MAX_CELLS + w;                      // starving: it beats every queue length
+            }
+            if(q > bestQueue || (q == bestQueue && w > longestWait)){
+                bestQueue = q;
+                longestWait = w;
+                chosen = a;
+            }
+        }
+        greenFrom[j] = chosen;                          // 0 if nobody can enter now: choose again next tick
+        if(chosen != 0){
+            greenUntil[j] = tickCount + greenTicksFor(laneQueue(chosen, j));
+        }
+    }
+    for(int k = 0; k < nNorm; k++){
+        int s = normSlots[k];
+        if(movers[s].from == greenFrom[j] && normalCanEnter(s, j)){
+            return s;
+        }
+    }
+    return -1;
+}
+
+void RoadSim::setAdaptiveSignals(bool on){
+    adaptiveSignals = on;
+    for(int j = 0; j <= NUM_JUNCTIONS; j++){
+        greenFrom[j] = 0;
+        greenUntil[j] = 0;
+    }
+    log(on ? "[SIGNAL] Adaptive signals ON: the busiest approach gets green, longer when it is denser."
+           : "[SIGNAL] Adaptive signals OFF: the vehicle that waited longest goes first.");
+}
+
 void RoadSim::phaseLaneMoves(){
     for(int a = 1; a <= NUM_JUNCTIONS; a++){
         for(int b = 1; b <= NUM_JUNCTIONS; b++){
@@ -725,6 +800,9 @@ void RoadSim::phasePatience(){
 
 // Construction and reset
 RoadSim::RoadSim() : city(NUM_JUNCTIONS){
+    auditOn = false;                    // settings first: reset() does not change them
+    auditFile = AUDIT_FILE_NAME;
+    adaptiveSignals = false;
     for(int i = 0; i < MAX_MOVERS; i++){
         clearMover(i);          // reset() looks at movers[], so they need a start value
     }
@@ -785,6 +863,11 @@ void RoadSim::reset(){
     statStranded = 0;
     statTimeouts = 0;
     statMaxAlive = 0;
+    statNormalTripTicks = 0;
+    for(int j = 0; j <= NUM_JUNCTIONS; j++){
+        greenFrom[j] = 0;
+        greenUntil[j] = 0;
+    }
 }
 
 //SPAWNING API
@@ -837,8 +920,8 @@ bool RoadSim::spawn(int id, int type, int from, int to, const int* path, int pat
     // exactly that list of junctions is used, after every road of it has been checked
     bool routeOk;
     if(path == nullptr){
-        int dist[7] = {0};
-        int prev[7] = {0};
+        int dist[JUNCTION_SLOTS] = {0};
+        int prev[JUNCTION_SLOTS] = {0};
         city.dijkstra(from, dist, prev);
         routeOk = city.buildRoute(to, dist, prev, v->getRoute());
     }
@@ -885,6 +968,8 @@ bool RoadSim::spawn(int id, int type, int from, int to, const int* path, int pat
     m.waitTicks = 0;
     m.waitCode = WAIT_NONE;
     m.reservedMask = 0;
+    m.spawnTick = tickCount;
+    m.drivenPath = name(from);
     spawnQ[from].enqueue(id);
 
     if(type > 0){
@@ -905,8 +990,8 @@ bool RoadSim::canReach(int from, int to){
     if(!validIndex(from) || !validIndex(to)){
         return false;
     }
-    int dist[7] = {0};
-    int prev[7] = {0};
+    int dist[JUNCTION_SLOTS] = {0};
+    int prev[JUNCTION_SLOTS] = {0};
     city.dijkstra(from, dist, prev);
     return dist[to] != NO_PATH;
 }
@@ -917,8 +1002,8 @@ bool RoadSim::spawnOpposing(int id, int from, int to){
         return false;
     }
     // 1. the route an EV would take (this list lives only inside this function)
-    int dist[7] = {0};
-    int prev[7] = {0};
+    int dist[JUNCTION_SLOTS] = {0};
+    int prev[JUNCTION_SLOTS] = {0};
     city.dijkstra(from, dist, prev);
     SinglyLinkedList forward;
     if(!city.buildRoute(to, dist, prev, forward)){
@@ -980,6 +1065,12 @@ bool RoadSim::closeRoad(int a, int b){
         return false;
     }
     log("[ROAD] The road " + name(a) + " - " + name(b) + " is now CLOSED. Vehicles on it finish the road, nobody new enters.");
+    // vehicles still WAITING at their start junction re-plan at once (the others find out at the stop line)
+    for(int i = 0; i < MAX_MOVERS; i++){
+        if(movers[i].veh != nullptr && movers[i].state == MV_QUEUED){
+            ensureRouteOpen(i);
+        }
+    }
     return true;
 }
 

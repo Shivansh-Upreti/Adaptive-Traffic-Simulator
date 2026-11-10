@@ -10,6 +10,7 @@ using namespace std;
 #include "SinglyLinkedList.hpp"
 #include "Graph.hpp"
 #include "TrafficFlow.hpp"      // only for NUM_JUNCTIONS and validIndex()
+#include "AuditLog.hpp"         // CSV log of every finished EV trip
 
 // ======================================================================
 // RoadSim (phase 3, "live traffic") -- vehicles that DRIVE ALONG THE ROADS.
@@ -50,6 +51,14 @@ const int GREEN_WAVE_AHEAD = 2;         // how many upcoming junctions an EV res
 const int PATIENCE_LIMIT = 300;         // a normal vehicle that cannot move for this many ticks gives up
 const int ROAD_LOG_SIZE = 12;           // the last 12 events are remembered
 const int MAX_ROAD_ID = 9999;
+
+// ADAPTIVE SIGNALS (key G). Off: the normal vehicle that waited longest enters a junction (the old rule).
+// On: each junction gives green to its busiest approach, for longer when that lane is denser
+// (the LOW / MODERATE / HEAVY levels of TrafficFlow). Emergency vehicles always go first.
+const int GREEN_TICKS_LOW = 4;          // 0-2 vehicles in the lane
+const int GREEN_TICKS_MODERATE = 8;     // 3-5 vehicles
+const int GREEN_TICKS_HEAVY = 12;       // 6 or more vehicles
+const int MAX_RED_TICKS = 40;           // a vehicle that waited this long gets green next, so no road waits for ever
 
 // where a vehicle is
 const int MV_FREE = 0;                  // this slot of movers[] is empty
@@ -98,6 +107,8 @@ struct Mover {
     int waitCode;                       // WAIT_... (EV only)
     int reservedMask;                   // bit j set = this EV holds junction j reserved
     long long lastMoveTick;             // the last tick in which it drove forward inside a lane (-1 = never)
+    long long spawnTick;                // the tick in which it was created (time taken = arrival tick - spawnTick)
+    string drivenPath;                  // the junctions REALLY passed, e.g. "J1->J3->J4" (a re-route changes it)
 };
 
 class RoadSim{
@@ -132,6 +143,16 @@ class RoadSim{
     int statStranded;                   // vehicles removed because no route was left
     int statTimeouts;                   // normal vehicles that gave up waiting
     int statMaxAlive;
+    long long statNormalTripTicks;      // sum of the trip times of the normal vehicles that arrived
+
+    // settings: they survive reset()
+    bool auditOn;                       // write a CSV row for every finished EV trip
+    string auditFile;
+    bool adaptiveSignals;
+
+    // adaptive signal state of every junction
+    int greenFrom[NUM_JUNCTIONS + 1];   // the approach (lane greenFrom -> j) that has green, 0 = none yet
+    long long greenUntil[NUM_JUNCTIONS + 1];
 
 
     /* -------------------------
@@ -244,6 +265,12 @@ class RoadSim{
 
     // a normal vehicle that cannot move for too long gives up (this also breaks a traffic jam that has locked itself)
     void phasePatience();
+    /* ---------------------------------
+        Adaptive signals
+       ---------------------------------*/
+    int laneQueue(int a, int j);        // normal vehicles in the lane a -> j (the density of that approach)
+    int greenTicksFor(int queue);
+    int pickNormalAdaptive(int j, int normSlots[], int nNorm);
 
 
     /* ---------------------------------
@@ -299,6 +326,18 @@ class RoadSim{
         bool closeRoad(int a, int b);
 
         bool openRoad(int a, int b, int length);
+        /* ----------------------------
+            Audit log and signals
+           ---------------------------- */
+        void setAuditLog(bool on){ auditOn = on; }
+        void setAuditFile(const string &file){ auditFile = file; }
+        string getAuditFile(){ return auditFile; }
+        void setAdaptiveSignals(bool on);
+        bool isAdaptive(){ return adaptiveSignals; }
+        // adaptive mode: the approach (the road a -> j) that has green at junction j, 0 = none
+        int getGreenApproach(int j){ return validIndex(j) ? greenFrom[j] : 0; }
+        // average trip time (ticks) of the normal vehicles that arrived, 0 if none yet
+        double getAverageTripTicks(){ return statArrivedNormal == 0 ? 0.0 : (double)statNormalTripTicks / statArrivedNormal; }
 
 
     
