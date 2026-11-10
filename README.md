@@ -2,10 +2,10 @@
 
 **A C++17 traffic simulator in which ambulances, fire trucks and police cars find the fastest route, clear their path through traffic, and resolve conflicts at junctions, built on our own data structures and shown in a real-time SFML window.**
 
-> https://github.com/user-attachments/assets/f1a2d5d8-e7a5-4533-b4bd-f74c847438e9
+> https://github.com/user-attachments/assets/b2313aa2-f5ce-4966-a692-144030a0c7f6
 
 <p>
-<img width="850" height="860" alt="ATS-Img" src="https://github.com/user-attachments/assets/e3c97724-670b-4c53-aac4-215c404cdeef" />
+<img width="850" height="860" alt="ATS-Img" src="https://github.com/user-attachments/assets/524da5d5-1606-4b7d-a36a-4abb799d0cc3" />
 </p>
 
 <div align="center"><a href="https://skillicons.dev"><img src="https://skillicons.dev/icons?i=cpp,cmake,vscode,git,github,windows" alt="Tech Stack" /></a>&nbsp;&nbsp;<img src="https://img.shields.io/badge/SFML-8CC445?style=for-the-badge&logo=sfml&logoColor=white" alt="SFML" />
@@ -64,7 +64,7 @@ Many traffic simulators either use ready-made containers or animate vehicles wit
 
 
 <p align="center">
-  <img width="800" height="606" alt="card_green_wave" src="https://github.com/user-attachments/assets/b1e9c9f4-3b2a-454b-bd15-071d10b23ce8" />
+  <img width="800" height="606" alt="card_green_wave" src="https://github.com/user-attachments/assets/77fe595c-8a67-402c-9124-edb3a2d87d2e" />
 </p>
 
 ---
@@ -399,7 +399,7 @@ Phase 1 is kept as a reference copy. Its files carry the `Phase1_` prefix, so re
 ### Controls and Simulation Modes
 
 <p align="center">
-  <img width="800" height="606" alt="card_demo_menu" src="https://github.com/user-attachments/assets/db3a153f-668e-4e8b-a061-2a6def9919af" />
+  <img width="800" height="606" alt="card_demo_menu" src="https://github.com/user-attachments/assets/917728d5-e543-40a1-988c-59ad5a6e55d4" />
 </p>
 
 The window opens in **LIVE mode**. **Tab** switches between LIVE and LAB. Both modes use the mouse to select junctions:
@@ -470,12 +470,12 @@ Press **D** in LIVE mode, then a number. Every scene starts with 40 ticks of see
 
 <table>
   <tr>
-    <td width="50%"><img src="https://github.com/user-attachments/assets/39205e1d-c627-46b3-892a-7844af3d59f7" alt="Demo 1: three emergency vehicles meet at J4 and the priority queue decides who goes first"></td>
-    <td width="50%"><img src="https://github.com/user-attachments/assets/3924d518-34c5-4b83-8679-1dcc9e94ecd7" alt="Demo 8: road J1 - J2 closes and the Ambulance is re-planned onto a detour"></td>
+    <td width="50%"><img src="https://github.com/user-attachments/assets/1eaa3cc3-e53e-42a6-96bb-29bb96b76bad" alt="Demo 1: three emergency vehicles meet at J4 and the priority queue decides who goes first"></td>
+    <td width="50%"><img src="https://github.com/user-attachments/assets/3850c6fb-42d0-4ea3-9e02-8c115e9ae954" alt="Demo 8: road J1 - J2 closes and the Ambulance is re-planned onto a detour"></td>
   </tr>
   <tr>
-    <td width="50%"><img src="https://github.com/user-attachments/assets/d986408f-0953-4e74-91e1-03a9c59f38c4" alt="Demo 9: the Ambulance drives down the cleared centre of a jammed road"></td>
-    <td width="50%"><img src="https://github.com/user-attachments/assets/c67a6d40-9c61-4891-80de-f65e839452c0" alt="Demo 10: every road into J6 closes and the Ambulance is stopped safely"></td>
+    <td width="50%"><img src="https://github.com/user-attachments/assets/4c43c0b8-834f-4554-b12d-537cd18afb15" alt="Demo 9: the Ambulance drives down the cleared centre of a jammed road"></td>
+    <td width="50%"><img src="https://github.com/user-attachments/assets/fa9a30d3-ebbc-4546-88bc-253b94d60c82" alt="Demo 10: every road into J6 closes and the Ambulance is stopped safely"></td>
   </tr>
 </table>
 
