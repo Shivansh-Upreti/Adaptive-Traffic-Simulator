@@ -55,6 +55,9 @@ int demoVehicleCount(int scenario){
     if(scenario == 1){
         return 3;
     }
+    if(scenario == 8 || scenario == 9 || scenario == 10){
+        return 1;
+    }
     return 2;
 }
 
@@ -67,6 +70,9 @@ string demoScenarioName(int scenario){
         case 5: return "Ultimate J4 bottleneck: Ambulance A, Ambulance B, Fire Truck and Police car meet at J4";
         case 6: return "Head-on road conflict: Ambulance J2->J4 against Ambulance J4->J2 on the same road";
         case 7: return "Simultaneous junction arrival: two Ambulances enter J4 from opposite sides, tie-breaker by arrival time";
+        case 8: return "Road closed: J1 - J2 is closed, the Ambulance J1 -> J6 takes the Dijkstra detour J1 -> J3 -> J4 -> J6";
+        case 9: return "Gridlock: an Ambulance overtakes a full lane J5 -> J6 down the center";
+        case 10: return "No way through: every road into J6 closes, the Ambulance is stopped safely at J2";
         default: return "unknown scenario";
     }
 }
@@ -98,6 +104,15 @@ void buildMultiEVDemo(RoadSim &world, TrafficFeeder &feeder, int scenario){
         type[0] = PRIORITY_AMBULANCE;   from[0] = 3;  to[0] = 6;  delay[0] = 0;    // Ambulance A: J3 -> J4 -> J6 (enters J4 from the J3 side)
         type[1] = PRIORITY_AMBULANCE;   from[1] = 6;  to[1] = 3;  delay[1] = 0;    // Ambulance B: J6 -> J4 -> J3 (enters J4 from the J6 side)
     }
+    else if(scenario == 8){
+        type[0] = PRIORITY_AMBULANCE;   from[0] = 1;  to[0] = 6;  delay[0] = 0;    // planned J1 -> J2 -> J6, then J1 - J2 closes
+    }
+    else if(scenario == 10){
+        type[0] = PRIORITY_AMBULANCE;   from[0] = 1;  to[0] = 6;  delay[0] = 0;    // planned J1 -> J2 -> J6, then J6 is cut off
+    }
+    else if(scenario == 9){
+        type[0] = PRIORITY_AMBULANCE;   from[0] = 5;  to[0] = 6;  delay[0] = 0;    // created after the jam has formed (below)
+    }
     else if(scenario == 1){
         type[0] = PRIORITY_POLICE;      from[0] = 2;  to[0] = 3;       // J2 -> J4 -> J3   created FIRST, but least urgent
         type[1] = PRIORITY_AMBULANCE;   from[1] = 3;  to[1] = 6;       // J3 -> J4 -> J6
@@ -126,6 +141,17 @@ void buildMultiEVDemo(RoadSim &world, TrafficFeeder &feeder, int scenario){
         world.tick();
     }
 
+    if(scenario == 9){
+        // the jam: 20 normal vehicles J5 -> J6 at once, then a few ticks so the lane fills and the line at J5 stays long
+        for(int k = 0; k < DEMO_JAM_SIZE; k++){
+            world.spawnNormal(DEMO_JAM_FIRST_ID + k, 5, 6);
+        }
+        for(int t = 0; t < DEMO_JAM_FILL_TICKS; t++){
+            feeder.feed(world);
+            world.tick();
+        }
+    }
+
     int lastDelay = 0;
     for(int k = 0; k < count; k++){
         if(delay[k] > lastDelay){
@@ -147,5 +173,13 @@ void buildMultiEVDemo(RoadSim &world, TrafficFeeder &feeder, int scenario){
             feeder.feed(world);
             world.tick();
         }
+    }
+    if(scenario == 8){
+        world.closeRoad(1, 2);          // the Ambulance still waits at J1: it is re-planned at once
+    }
+    if(scenario == 10){
+        world.closeRoad(2, 6);          // every road into J6 closes. The Ambulance's first road J1 - J2 is still open,
+        world.closeRoad(4, 6);          // so it starts; at the stop line of J2 it finds no way left and is stopped
+        world.closeRoad(5, 6);
     }
 }

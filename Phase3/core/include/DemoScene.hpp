@@ -50,7 +50,7 @@ class TrafficFeeder{
 };
 
 //=======================================================================================================================
-// The demo scenes (a sub-menu: the user picks one of seven)
+// The demo scenes (a sub-menu: the user picks one of ten, key 0 = scene 10)
 //   1  J4 CONVERGENCE   Ambulance (1), Fire Truck (2) and Police car (3) start at the SAME moment from three different
 //                       junctions and all three reach the stop lines of J4 together. The priority queue sorts them:
 //                       1st Ambulance, 2nd Fire Truck, 3rd Police car (the Police car was even created FIRST)
@@ -66,16 +66,27 @@ class TrafficFeeder{
 //                       own side of the road, so they pass each other without clipping
 //   7  JUNCTION ARRIVAL Ambulance A (J3 -> J4 -> J6) and Ambulance B (J6 -> J4 -> J3) enter J4 from OPPOSITE sides in the same
 //                       tick. Equal priority: the earlier arrival time decides who gets the junction first
+//   8  ROAD CLOSED      Ambulance J1 -> J6. Its shortest way J1 -> J2 -> J6 (11) is closed right after it is created:
+//                       Dijkstra re-plans the waiting Ambulance at once: J1 -> J3 -> J4 -> J6 (14)
+//   9  GRIDLOCK         20 normal vehicles want to leave J5 for J6 at once: the lane fills up and a long line forms at J5.
+//                       Then an Ambulance J5 -> J6 is created: it leaves the line first and drives down the cleared
+//                       center while the vehicles in the lane wait on the shoulders (center-overtake)
+//   10 NO WAY THROUGH   Ambulance J1 -> J2 -> J6. Right after it starts, all three roads into J6 close. It drives on to J2,
+//                       finds no way left at the stop line, and is stopped and removed cleanly: [STOPPED] in the log,
+//                       no crash and no vehicle stuck for ever (key 0 in the sub-menu)
 // In scenes 2 - 4 the equal priority is decided by the EARLIER ARRIVAL TIME (ArrayPriorityQueue, unchanged from Phase 2).
 // The routes below were found with a timing search (the traffic is the same every run), so they REALLY meet at J4.
 // Scenes 1 - 4 have at most three emergency vehicles, scene 5 has four. Their ids are always 901, 902, 903 and 904.
 //=======================================================================================================================
 
-const int DEMO_SCENARIOS = 7;
+const int DEMO_SCENARIOS = 10;
 const int DEMO_ID_1 = 901;
 const int DEMO_ID_2 = 902;
 const int DEMO_ID_3 = 903;
 const int DEMO_ID_4 = 904;                  // only scene 5 uses a fourth vehicle
+const int DEMO_JAM_FIRST_ID = 801;          // scene 9: the normal vehicles of the jam use ids 801 .. 820
+const int DEMO_JAM_SIZE = 20;
+const int DEMO_JAM_FILL_TICKS = 8;          // scene 9: ticks the jam gets before the Ambulance is created
 
 // how many emergency vehicles a scenario creates (3 for scenario 1, 4 for scenario 5, otherwise 2: scenes 2, 3, 4, 6 and 7)
 int demoVehicleCount(int scenario);
