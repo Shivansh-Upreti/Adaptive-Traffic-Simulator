@@ -70,9 +70,9 @@ void drawLiveRoads(sf::RenderTarget &target, sf::Font &font, bool fontOk, RoadSi
         }
     }
     // closed roads: red dashed line with a cross
-    for(int k = 0; k < START_ROADS; k++){
-        int a = ROAD_A[k];
-        int b = ROAD_B[k];
+    for(int k = 0; k < NUM_ROADS; k++){
+        int a = ROAD_FROM[k];
+        int b = ROAD_TO[k];
         if(w.hasRoad(a, b)){
             continue;
         }
@@ -131,6 +131,54 @@ void drawLiveSignal(sf::RenderTarget &target, sf::Font &font, bool fontOk, bool 
     }
     drawText(target, font, fontOk, "EV", 9, x + 4.f, y + 39.f, sf::Color(150, 155, 170));
     drawText(target, font, fontOk, "NOR", 9, x + 21.f, y + 39.f, sf::Color(150, 155, 170));
+}
+
+void drawApproachLights(sf::RenderTarget &target, RoadSim &w){
+    if(!w.isAdaptive()){
+        return;                                         // the old rule has no green phases: nothing to show
+    }
+    const float BACK = 44.f;                            // from the junction center back along the road (just behind the stop line)
+    const float SIDE = LIVE_ROAD_WIDTH / 2.f + 6.f;     // beside the road, on the side of the lane a -> j
+    const float R = 5.f;
+    for(int j = 1; j <= NUM_JUNCTIONS; j++){
+        int green = w.getGreenApproach(j);
+        bool reserved = w.isReserved(j);                // an EV holds the junction: every normal approach waits
+        for(int a = 1; a <= NUM_JUNCTIONS; a++){
+            if(a == j || w.getCells(a, j) == 0){
+                continue;                               // no lane a -> j
+            }
+            float dx = JX[a] - JX[j];
+            float dy = JY[a] - JY[j];
+            float len = sqrt(dx * dx + dy * dy);
+            Pt n = rightNormal(a, j);                   // the side the normal lane a -> j is drawn on
+            float back = BACK;
+            float x = 0.f;
+            float y = 0.f;
+            while(true){
+                x = JX[j] + dx / len * back + n.x * SIDE;
+                y = JY[j] + dy / len * back + n.y * SIDE;
+                // the junction's signal box (drawLiveSignal at JX + 32, JY - 18, 40 x 38) is to the right of the
+                // junction: a road leaving to the right runs under it, so its light moves further back along the road
+                bool underBox = x > JX[j] + 32.f - R - 2.f && x < JX[j] + 72.f + R + 2.f
+                             && y > JY[j] - 18.f - R - 2.f && y < JY[j] + 20.f + R + 2.f;
+                if(!underBox || back > len / 2.f){
+                    break;
+                }
+                back = back + 4.f;
+            }
+            bool isGreen = (a == green) && !reserved;
+            sf::CircleShape light(R);
+            light.setOrigin(R, R);
+            light.setPosition(x, y);
+            light.setFillColor(isGreen ? sf::Color(80, 230, 100) : sf::Color(235, 60, 60));
+            light.setOutlineColor(sf::Color(15, 17, 22));
+            light.setOutlineThickness(2.f);
+            if(!w.hasRoad(a, j)){
+                light.setFillColor(sf::Color(90, 90, 90));      // closed road: the light is off
+            }
+            target.draw(light);
+        }
+    }
 }
 
 void drawLiveJunctions(sf::RenderTarget &target, sf::Font &font, bool fontOk, RoadSim &w, LiveView &view, float seconds){
@@ -392,7 +440,7 @@ void drawLiveSidebar(sf::RenderTarget &target, sf::Font &font, bool fontOk, Road
     const char* controls[6] = {
         "Left click START  /  Right click DESTINATION",
         "Press U for User Defined Input Mode",
-        "D      demo scenes: sub-menu 1 - 7",
+        "D demo scenes (1 - 9, 0)   G adaptive signals",
         "K self-check   T pause   + / -  speed",
         "R reset   Tab lab view   ESC quit",
         "Road number = travel time in seconds"
@@ -401,6 +449,7 @@ void drawLiveSidebar(sf::RenderTarget &target, sf::Font &font, bool fontOk, Road
         drawText(target, font, fontOk, controls[i], 11, x, y, sf::Color(185, 190, 202));
         y = y + 14.f;
     }
+    drawText(target, font, fontOk, w.isAdaptive() ? "Signals: ADAPTIVE - lights show the green road" : "Signals: longest wait first", 11, x, y, sf::Color(255, 220, 60));
 
     y = 330.f;
     drawText(target, font, fontOk, "Event log (newest first)", 13, x, y, head);
@@ -435,8 +484,8 @@ void drawLiveSidebar(sf::RenderTarget &target, sf::Font &font, bool fontOk, Road
 
 void drawDemoMenu(sf::RenderTarget &target, sf::Font &font, bool fontOk){
     float x = 40.f;
-    float y = 592.f;
-    sf::RectangleShape box(sf::Vector2f(880.f, 96.f));
+    float y = 577.f;
+    sf::RectangleShape box(sf::Vector2f(880.f, 111.f));
     box.setPosition(x, y);
     box.setFillColor(sf::Color(14, 18, 28, 235));
     box.setOutlineColor(sf::Color(255, 220, 60));
@@ -448,7 +497,8 @@ void drawDemoMenu(sf::RenderTarget &target, sf::Font &font, bool fontOk){
     drawText(target, font, fontOk, "[2] Stable Queue Resolution: Priority 1 (Arrival Time)   [3] Stable Queue Resolution: Priority 2 (Arrival Time)", 11, x + 12.f, y + 34.f, normal);
     drawText(target, font, fontOk, "[4] Stable Queue Resolution: Priority 3 (Arrival Time)   [5] Advanced Multi-Lane Stress Test (4 EVs)", 11, x + 12.f, y + 49.f, normal);
     drawText(target, font, fontOk, "[6] Head-On Road Conflict (Ambulances J2 <-> J4, Same Road)     [7] Simultaneous Junction Arrival & Tie-Breaker", 11, x + 12.f, y + 64.f, normal);
-    drawText(target, font, fontOk, "[ESC] Return to Main Simulation", 11, x + 12.f, y + 79.f, normal);
+    drawText(target, font, fontOk, "[8] Road Closed: Dijkstra Detour     [9] Gridlock: Center-Overtake J5 -> J6     [0] No Way Through: Roads into J6 Closed", 11, x + 12.f, y + 79.f, normal);
+    drawText(target, font, fontOk, "[ESC] Return to Main Simulation", 11, x + 12.f, y + 94.f, normal);
 }
 
 void drawUserMenu(sf::RenderTarget &target, sf::Font &font, bool fontOk, LiveView &view){
@@ -482,6 +532,7 @@ void drawLiveFrame(sf::RenderTarget &target, sf::Font &font, bool fontOk, RoadSi
     drawLiveRoutes(target, w);
     drawLiveJunctions(target, font, fontOk, w, view, seconds);
     drawLiveVehicles(target, font, fontOk, w, view, seconds);
+    drawApproachLights(target, w);                      // after the vehicles, so a car never hides a light
     drawLiveLegend(target, font, fontOk);
     drawLiveSidebar(target, font, fontOk, w, view);
     if(view.demoMenuOpen){

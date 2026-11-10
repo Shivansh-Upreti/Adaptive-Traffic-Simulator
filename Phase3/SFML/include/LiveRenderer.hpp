@@ -49,6 +49,11 @@ void drawLiveRoutes(sf::RenderTarget &target, RoadSim &w);
 // two lamp heads: EV and NOR. reserved (green wave): EV green, NOR red. normal: EV red, NOR green
 void drawLiveSignal(sf::RenderTarget &target, sf::Font &font, bool fontOk, bool reserved, float x, float y);
 
+// ADAPTIVE SIGNALS (key G): one small light per approach, next to its stop line.
+// Green = this road has the green at that junction, red = it waits. All red while an emergency vehicle
+// has reserved the junction. Drawn only while adaptive signals are ON.
+void drawApproachLights(sf::RenderTarget &target, RoadSim &w);
+
 void drawLiveJunctions(sf::RenderTarget &target, sf::Font &font, bool fontOk, RoadSim &w, LiveView &view, float seconds);
 
 // ----------------------------------------------------------------------

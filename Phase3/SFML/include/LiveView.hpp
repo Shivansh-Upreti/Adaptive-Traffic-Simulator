@@ -53,8 +53,8 @@ class LiveView{
         bool demoActive;                    // a demo scene is running (it ends when its emergency vehicles are done)
         int uiState;                        // UI_MAIN, UI_USER_MENU, UI_SINGLE, UI_BATCH or UI_ROAD
         bool consoleLog;                    // true: the user actions are also written to the console (main.cpp turns it on)
-        bool demoMenuOpen;                  // the demo sub-menu is on screen: the keys 1 - 7 choose a scenario
-        int demoScenario;                   // the scenario that runs (or ran last), 1 - 7
+        bool demoMenuOpen;                  // the demo sub-menu is on screen: the keys 1 - 9 and 0 (= 10) choose a scenario
+        int demoScenario;                   // the scenario that runs (or ran last), 1 - 10
         float tickTimer;                    // seconds since the last tick
         PosSnap prev[MAX_MOVERS];
         float lateral[MAX_MOVERS];          // sideways offset in pixels (positive = to the right of the driving direction)
@@ -122,7 +122,7 @@ class LiveView{
         // 5 normal vehicles at START, all driving to DESTINATION, created at once
         void actionBatchSpawn(RoadSim &w);
 
-        // D: opens (or closes) the demo SUB-MENU. The next key 1 - 7 starts that scenario (see core/include/DemoScene.hpp)
+        // D: opens (or closes) the demo SUB-MENU. The next key 1 - 9 or 0 (= 10) starts that scenario (see core/include/DemoScene.hpp)
         void actionToggleDemoMenu(RoadSim &w);
 
         // starts one demo scenario: 1 = J4 convergence, 2 / 3 / 4 = tie-breaker of two Ambulances / Fire Trucks / Police cars

@@ -19,7 +19,7 @@ using namespace std;
 #include "include/LiveRenderer.hpp"
 
 // ----------------------------------------------------------------------
-// The multi-EV demo scenes (key D in live mode opens a SUB-MENU, then the key 1 - 7 picks the scenario).
+// The multi-EV demo scenes (key D in live mode opens a SUB-MENU, then the key 1 - 9 or 0 (= scene 10) picks the scenario).
 //   1  J4 CONVERGENCE   Ambulance (priority 1), Fire Truck (2) and Police car (3) start from three different junctions
 //                       (J3, J5, J2) at the same moment and all reach J4 together. The priority queue sorts them:
 //                       1st Ambulance, 2nd Fire Truck, 3rd Police car.
@@ -96,7 +96,9 @@ int main(){
     ViewModel labView;
     bool liveMode = true;
 
+    world.setAuditLog(true);                // every finished EV trip becomes a row of ev_audit_log.csv (R empties it)
     world.addNote("[INFO] Press U for User Defined Input Mode (spawn, batch, road closure, opposing traffic) or D for the demo scenes.");
+    world.addNote("[INFO] Press G to switch adaptive traffic signals on or off.");
 
     sf::Clock frameClock;       // time since the last frame
     sf::Clock totalClock;       // time since the start (used for the blinking lights)
@@ -170,7 +172,7 @@ int main(){
                     }
                 }
                 else if(liveMode && liveView.demoMenuOpen){
-                    // the demo SUB-MENU is open: 1 - 7 choose a scenario, any other key closes the menu
+                    // the demo SUB-MENU is open: 1 - 9 and 0 (= 10) choose a scenario, any other key closes the menu
                     int choice = 0;
                     switch(event.key.code){
                         case sf::Keyboard::Num1:
@@ -200,6 +202,18 @@ int main(){
                         case sf::Keyboard::Num7:
                         case sf::Keyboard::Numpad7:
                             choice = 7;
+                            break;
+                        case sf::Keyboard::Num8:
+                        case sf::Keyboard::Numpad8:
+                            choice = 8;
+                            break;
+                        case sf::Keyboard::Num9:
+                        case sf::Keyboard::Numpad9:
+                            choice = 9;
+                            break;
+                        case sf::Keyboard::Num0:
+                        case sf::Keyboard::Numpad0:
+                            choice = 10;                // key 0 = scene 10
                             break;
                         default:
                             break;
@@ -242,7 +256,7 @@ int main(){
                             break;
                         case sf::Keyboard::D:
                             if(liveView.uiState == UI_MAIN){
-                                liveView.actionToggleDemoMenu(world);  // opens the demo sub-menu (keys 1 - 7)
+                                liveView.actionToggleDemoMenu(world);  // opens the demo sub-menu (keys 1 - 9, 0)
                             }
                             break;
                         case sf::Keyboard::K:
@@ -254,6 +268,12 @@ int main(){
                         case sf::Keyboard::R:
                             world.reset();          // deletes every vehicle that is still alive
                             liveView.reset();       // and the window forgets its selection and timeline too
+                            if(!clearEVAuditLog(world.getAuditFile())){
+                                world.addNote("[AUDIT] The audit file could not be emptied.");
+                            }
+                            break;
+                        case sf::Keyboard::G:
+                            world.setAdaptiveSignals(!world.isAdaptive());
                             break;
                         default:
                             break;
