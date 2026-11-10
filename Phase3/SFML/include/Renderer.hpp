@@ -32,11 +32,8 @@ const float JY[NUM_JUNCTIONS + 1] = {0.f, 340.f, 130.f, 560.f, 340.f, 560.f, 240
 const float PX[NUM_JUNCTIONS + 1] = {0.f, 30.f, 215.f, 215.f, 420.f, 620.f, 760.f};
 const float PY[NUM_JUNCTIONS + 1] = {0.f, 385.f, 55.f, 612.f, 372.f, 612.f, 170.f};
 
-// the nine roads of the starting map. A road that is missing from the graph is
-// drawn as a red dashed line, so a closed road stays visible
-const int START_ROADS = 9;
-const int ROAD_A[START_ROADS] = {1, 1, 2, 3, 3, 4, 2, 4, 5};
-const int ROAD_B[START_ROADS] = {2, 3, 4, 4, 5, 5, 6, 6, 6};
+// the roads of the starting map come from core/include/CityMap.hpp (NUM_ROADS, ROAD_FROM, ROAD_TO).
+// A road that is missing from the graph is drawn as a red dashed line, so a closed road stays visible
 
 const int BOXES_SHOWN = 8;          // at most 8 vehicle boxes per lane row, the rest is shown as "+N"
 

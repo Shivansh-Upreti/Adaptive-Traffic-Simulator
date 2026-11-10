@@ -4,6 +4,7 @@ using namespace std;
 #include "ArrayQueue.hpp"
 #include "ArrayStack.hpp"
 #include "SinglyLinkedList.hpp"
+#include "CityMap.hpp"          // NUM_JUNCTIONS, JUNCTION_SLOTS
 
 const int NO_PATH = 999999;   // distance used for "cannot reach this junction"
 // Travel TIME of a road (what the window shows next to every road). One tick of the live simulation is one second.
@@ -11,7 +12,6 @@ const int NO_PATH = 999999;   // distance used for "cannot reach this junction"
 // L * SECONDS_PER_DISTANCE seconds. Every normal vehicle that stands still on the road adds WAIT_PENALTY_SECONDS.
 const int SECONDS_PER_DISTANCE = 1;
 const int WAIT_PENALTY_SECONDS = 1;
-const int GRAPH_MAX_JUNCTIONS = 6;   // adjList[] and the dist[]/prev[] arrays of the callers have 7 slots (0 unused)
 
 // one road leaving a junction
 struct Edge {
@@ -22,7 +22,7 @@ struct Edge {
 
 // road map as an adjacency list: every junction has its own linked list of roads
 class Graph {
-    Edge* adjList[7];       // adjList[i] = roads leaving junction i (index 0 is not used)
+    Edge* adjList[JUNCTION_SLOTS];       // adjList[i] = roads leaving junction i (index 0 is not used)
     int totalJunctions;
 
     // looks for the road from -> to, returns nullptr if there is none
@@ -52,7 +52,7 @@ public:
     // the second limit is a fixed number, so even a wrong totalJunctions can never let an
     // index reach past the 7-slot arrays
     bool isValid(int j) {
-        return j >= 1 && j <= totalJunctions && j <= GRAPH_MAX_JUNCTIONS;
+        return j >= 1 && j <= totalJunctions && j <= NUM_JUNCTIONS;
     }
 
     // roads are two way, so the edge is added in both lists

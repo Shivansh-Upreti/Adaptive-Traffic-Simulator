@@ -103,9 +103,9 @@ void drawRoads(sf::RenderTarget &target, sf::Font &font, bool fontOk, Simulator 
     }
 
     // closed roads: red dashed line with a cross
-    for(int k = 0; k < START_ROADS; k++){
-        int a = ROAD_A[k];
-        int b = ROAD_B[k];
+    for(int k = 0; k < NUM_ROADS; k++){
+        int a = ROAD_FROM[k];
+        int b = ROAD_TO[k];
         if(sim.hasRoad(a, b)){
             continue;
         }

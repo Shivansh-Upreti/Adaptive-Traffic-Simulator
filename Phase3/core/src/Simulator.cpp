@@ -7,15 +7,9 @@ void Simulator::log(string msg){
 }
 
 void Simulator::buildMap(){
-    city.addRoad(1, 2, 5);
-    city.addRoad(1, 3, 4);
-    city.addRoad(2, 4, 4);
-    city.addRoad(3, 4, 5);
-    city.addRoad(3, 5, 5);
-    city.addRoad(4, 5, 4);
-    city.addRoad(2, 6, 6);
-    city.addRoad(4, 6, 5);
-    city.addRoad(5, 6, 7);
+    for(int i = 0; i < NUM_ROADS; i++){             // the shared map of CityMap.hpp (the same roads as RoadSim)
+        city.addRoad(ROAD_FROM[i], ROAD_TO[i], ROAD_LENGTH[i]);
+    }
 }
 
 int Simulator::findIndex(int id){
@@ -209,8 +203,8 @@ void Simulator::finishTrip(){
 }
 
 bool Simulator::reroute(int from){
-    int dist[7] = {0};
-    int prev[7] = {0};
+    int dist[JUNCTION_SLOTS] = {0};
+    int prev[JUNCTION_SLOTS] = {0};
     SinglyLinkedList &route = fleet[activeIdx]->getRoute();
 
     city.dijkstra(from, dist, prev);
@@ -360,8 +354,8 @@ int Simulator::startDispatch(){
     log("[DISPATCH] " + req.label + " " + to_string(req.vehicleID) + " (priority " + to_string(req.priorityLVL) + "): "
         + name(req.from) + " -> " + name(req.to));
 
-    int dist[7] = {0};
-    int prev[7] = {0};
+    int dist[JUNCTION_SLOTS] = {0};
+    int prev[JUNCTION_SLOTS] = {0};
     SinglyLinkedList &route = fleet[idx]->getRoute();   // a reference: the list stays inside the vehicle
     route.clear();
     city.dijkstra(req.from, dist, prev);

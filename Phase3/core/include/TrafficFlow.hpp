@@ -5,7 +5,7 @@ using namespace std;
 #include "ArrayQueue.hpp"
 #include "TrafficSignal.hpp"
 
-const int NUM_JUNCTIONS = 6;
+#include "CityMap.hpp"          // NUM_JUNCTIONS
 const int MODERATE_FROM = 3;    // 3 or more vehicles waiting = moderate traffic
 const int HEAVY_FROM = 6;       // 6 or more vehicles waiting = heavy traffic
 

@@ -54,15 +54,15 @@ bool Graph::removeEdge(int from, int to){
 }
 
 Graph::Graph(int n){
-    if(n > GRAPH_MAX_JUNCTIONS) n = GRAPH_MAX_JUNCTIONS;    // only 6 junctions are supported
+    if(n > NUM_JUNCTIONS) n = NUM_JUNCTIONS;        // the arrays are sized for NUM_JUNCTIONS (CityMap.hpp)
     totalJunctions = n;
-    for(int i = 0; i < 7; i++) {
+    for(int i = 0; i < JUNCTION_SLOTS; i++) {
         adjList[i] = nullptr;
     }
 }
 
 void Graph::clear(){
-    for(int i = 0; i < 7; i++) {
+    for(int i = 0; i < JUNCTION_SLOTS; i++) {
         Edge* e = adjList[i];
         while(e != nullptr) {
             Edge* nextEdge = e->next;   // save next BEFORE the delete
@@ -112,7 +112,7 @@ int Graph::getTravelTime(int j1, int j2, int waitingVehicles, int extraDelay){
 
 int Graph::bfs(int src){
     if(!isValid(src)) return 0;
-    bool visited[7] = {false};
+    bool visited[JUNCTION_SLOTS] = {false};
     ArrayQueue q;
     int count = 0;
 
@@ -146,7 +146,7 @@ void Graph::dfsVisit(int u, bool visited[]){
 
 void Graph::dfs(int src){
     if(!isValid(src)) return;
-    bool visited[7] = {false};
+    bool visited[JUNCTION_SLOTS] = {false};
     cout << "DFS from J" << src << ": ";
     dfsVisit(src, visited);
     cout << endl;
@@ -155,7 +155,7 @@ void Graph::dfs(int src){
 bool Graph::dijkstra(int src, int dist[], int prev[]){
     if(!isValid(src)) return false;
 
-    bool visited[7] = {false};
+    bool visited[JUNCTION_SLOTS] = {false};
     for(int i = 1; i <= totalJunctions; i++) {
         dist[i] = NO_PATH;
         prev[i] = -1;
